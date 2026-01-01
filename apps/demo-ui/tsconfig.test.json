@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "NodeNext",
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ],
+    "strict": true,
+    "outDir": ".tmp-test",
+    "rootDir": ".",
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/ui/viz/influenceMath.ts",
+    "test/influenceMath.test.ts"
+  ]
+}

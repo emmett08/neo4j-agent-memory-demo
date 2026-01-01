@@ -1,0 +1,541 @@
+{
+  "memories": [
+    {
+      "kind": "semantic",
+      "polarity": "positive",
+      "title": "UX: Reduce cognitive load with progressive disclosure",
+      "content": "Prefer progressive disclosure: show the 90% path by default (primary action + minimal fields), and reveal advanced options only when needed. This reduces cognitive load and improves task completion rate.",
+      "tags": [
+        "ux",
+        "ui",
+        "design",
+        "principles",
+        "progressive-disclosure",
+        "react",
+        "typescript"
+      ],
+      "confidence": 0.85,
+      "signals": {
+        "symptoms": [
+          "too many options",
+          "overwhelming form",
+          "users stuck"
+        ],
+        "environment": [
+          "web",
+          "react19",
+          "ts5+"
+        ]
+      }
+    },
+    {
+      "kind": "procedural",
+      "polarity": "positive",
+      "title": "React 19 + TS5: Build a chip-based filter input",
+      "content": "Implement chips as controlled state (string[]) with keyboard affordances: Enter to add, Backspace on empty to remove last, click X to remove. Debounce suggestion fetch. Ensure accessible roles (listbox/option) and aria-labels.",
+      "tags": [
+        "react19",
+        "typescript5",
+        "ui",
+        "chips",
+        "filters",
+        "accessibility"
+      ],
+      "confidence": 0.82,
+      "triage": {
+        "symptoms": [
+          "need tags input",
+          "filter by labels"
+        ],
+        "likelyCauses": [
+          "no reusable chip component",
+          "inconsistent state handling"
+        ],
+        "verificationSteps": [
+          "Verify keyboard: Enter adds, Backspace removes, Tab navigates",
+          "Run axe accessibility check"
+        ],
+        "fixSteps": [
+          "Use controlled state for chips",
+          "Implement aria roles and labels",
+          "Add debounce for suggestions"
+        ],
+        "gotchas": [
+          "Don\u2019t allow duplicate chips unless meaningful",
+          "Avoid uncontrolled input causing desync"
+        ]
+      }
+    },
+    {
+      "kind": "procedural",
+      "polarity": "positive",
+      "title": "UX: Structure a prompt builder UI for agent memory injection",
+      "content": "Use a 3-panel layout: (1) Prompt editor, (2) Memory filters (chips, kind toggles, env fingerprint), (3) Retrieved context preview with cited [MEM:id] blocks. Add 'Retrieve' then 'Run agent' actions to separate intent from execution.",
+      "tags": [
+        "ux",
+        "prompt-builder",
+        "agent",
+        "memory",
+        "react19",
+        "typescript5"
+      ],
+      "confidence": 0.8,
+      "triage": {
+        "symptoms": [
+          "users unsure what will be sent to agent",
+          "hard to debug memory selection"
+        ],
+        "likelyCauses": [
+          "no preview step",
+          "too many controls mixed"
+        ],
+        "verificationSteps": [
+          "Confirm preview shows Fix/Do-not-do sections",
+          "User can copy final prompt"
+        ],
+        "fixSteps": [
+          "Add ContextBundle preview panel",
+          "Separate retrieve and run CTAs",
+          "Show citations and scores"
+        ],
+        "gotchas": [
+          "Don\u2019t auto-run on every keystroke",
+          "Keep preview deterministic"
+        ]
+      }
+    },
+    {
+      "kind": "semantic",
+      "polarity": "positive",
+      "title": "UI: Always provide one obvious primary action",
+      "content": "For each screen, prefer one primary call-to-action (CTA) with a clear label. Secondary actions should be visually subordinate. This improves decision speed and reduces misclicks.",
+      "tags": [
+        "ui",
+        "ux",
+        "principles",
+        "cta",
+        "interaction-design"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "kind": "semantic",
+      "polarity": "positive",
+      "title": "Accessibility: Use semantic HTML and ARIA only when needed",
+      "content": "Prefer semantic elements (button, input, label) before ARIA. When ARIA is used, ensure roles and aria-* match actual behaviour (e.g. listbox/option for suggestions). Keyboard support is mandatory.",
+      "tags": [
+        "accessibility",
+        "a11y",
+        "react19",
+        "ui",
+        "typescript5"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "kind": "procedural",
+      "polarity": "positive",
+      "title": "React 19: Manage async UI states cleanly",
+      "content": "Represent async operations with explicit states: idle \u2192 loading \u2192 success/error. Disable the primary button while loading; show inline errors near fields. Keep optimistic UI minimal unless rollback is clear.",
+      "tags": [
+        "react19",
+        "ui-state",
+        "async",
+        "typescript5",
+        "ux"
+      ],
+      "confidence": 0.83,
+      "triage": {
+        "symptoms": [
+          "spinners everywhere",
+          "double submits",
+          "confusing errors"
+        ],
+        "likelyCauses": [
+          "no explicit state machine",
+          "actions not disabled"
+        ],
+        "verificationSteps": [
+          "Click Run twice; ensure only one request",
+          "Force 500 and see error placement"
+        ],
+        "fixSteps": [
+          "Introduce explicit request state",
+          "Disable CTA while loading",
+          "Render error summary + inline"
+        ],
+        "gotchas": [
+          "Avoid global spinners that hide context",
+          "Keep retry action near error"
+        ]
+      }
+    },
+    {
+      "kind": "semantic",
+      "polarity": "negative",
+      "title": "Anti-pattern: Auto-running agent on every keystroke",
+      "content": "Automatically re-running an agent on each prompt change increases cost, noise, and user confusion. Prefer an explicit Retrieve step and a separate Run step.",
+      "tags": [
+        "anti-pattern",
+        "ux",
+        "agent",
+        "react19",
+        "typescript5"
+      ],
+      "confidence": 0.85,
+      "antiPattern": {
+        "action": "Auto-run retrieval/agent on every keystroke",
+        "whyBad": "Creates non-deterministic UX, high latency/cost, and makes it hard to attribute which changes mattered",
+        "saferAlternative": "Use explicit buttons for Retrieve and Run; debounce only suggestion fetching"
+      }
+    },
+    {
+      "kind": "semantic",
+      "polarity": "negative",
+      "title": "Anti-pattern: Hiding validation errors in a toast only",
+      "content": "Errors shown only via transient toasts are easy to miss and not actionable. Users need inline errors near fields and an error summary.",
+      "tags": [
+        "anti-pattern",
+        "ux",
+        "validation",
+        "react19",
+        "typescript5"
+      ],
+      "confidence": 0.84,
+      "antiPattern": {
+        "action": "Toast-only form validation errors",
+        "whyBad": "Users miss them; not tied to field; not accessible",
+        "saferAlternative": "Show inline errors + summary; focus first invalid field"
+      }
+    },
+    {
+      "kind": "procedural",
+      "polarity": "positive",
+      "title": "UI: Design a port drawer / inspector panel pattern",
+      "content": "Use a persistent inspector panel with collapsible groups and search. For repeated template instances, show a group header with colour + badge count, and allow 'highlight on canvas' action. Provide breadcrumbs for nested templates.",
+      "tags": [
+        "ui",
+        "inspector",
+        "port-drawer",
+        "information-architecture",
+        "react19",
+        "typescript5"
+      ],
+      "confidence": 0.78,
+      "triage": {
+        "symptoms": [
+          "ports hard to find",
+          "repeated templates confusing"
+        ],
+        "likelyCauses": [
+          "no grouping or search",
+          "no visual linkage"
+        ],
+        "verificationSteps": [
+          "User can locate a port within 5s",
+          "Selecting a port highlights its edge on canvas"
+        ],
+        "fixSteps": [
+          "Add grouping by template instance",
+          "Add search/filter",
+          "Add highlight-on-canvas affordance"
+        ],
+        "gotchas": [
+          "Don\u2019t overuse colour; ensure contrast",
+          "Keep panel width adjustable"
+        ]
+      }
+    },
+    {
+      "kind": "episodic",
+      "polarity": "positive",
+      "title": "Session 2024-12-15: Successfully debugged React 19 hydration mismatch",
+      "content": "User reported 'Hydration failed' error in production. Investigation revealed server-rendered timestamp differed from client. Fixed by moving timestamp generation to useEffect. Took 45 minutes. User confirmed fix worked in production.",
+      "tags": [
+        "react19",
+        "hydration",
+        "debugging",
+        "ssr",
+        "production-issue"
+      ],
+      "confidence": 0.92,
+      "episode": {
+        "when": "2024-12-15T14:30:00Z",
+        "where": "Production debugging session",
+        "who": "User EMR23",
+        "what": "Hydration mismatch causing production errors",
+        "outcome": "Resolved by moving timestamp to client-side useEffect"
+      }
+    },
+    {
+      "kind": "episodic",
+      "polarity": "positive",
+      "title": "Session 2024-12-10: User testing revealed chip input confusion",
+      "content": "During user testing, 3 out of 5 users tried to press Enter to add chips but nothing happened. They expected keyboard shortcuts. Added Enter to add, Backspace to remove last chip. User satisfaction improved significantly.",
+      "tags": [
+        "user-testing",
+        "chips",
+        "keyboard",
+        "ux",
+        "react19"
+      ],
+      "confidence": 0.88,
+      "episode": {
+        "when": "2024-12-10T10:00:00Z",
+        "where": "User testing session",
+        "who": "5 test users",
+        "what": "Chip input lacked keyboard affordances",
+        "outcome": "Added Enter/Backspace shortcuts, improved UX"
+      }
+    },
+    {
+      "kind": "episodic",
+      "polarity": "negative",
+      "title": "Session 2024-11-28: Auto-refresh caused 500+ unnecessary API calls",
+      "content": "Implemented auto-refresh on prompt change. Within 1 hour, logs showed 500+ retrieval calls from a single user typing a long prompt. Cost spike and rate limiting kicked in. Removed auto-refresh, added explicit Retrieve button.",
+      "tags": [
+        "performance",
+        "cost",
+        "anti-pattern",
+        "agent",
+        "react19"
+      ],
+      "confidence": 0.95,
+      "episode": {
+        "when": "2024-11-28T16:45:00Z",
+        "where": "Production monitoring",
+        "who": "Single user typing",
+        "what": "Auto-refresh caused API call explosion",
+        "outcome": "Removed auto-refresh, added explicit button"
+      },
+      "antiPattern": {
+        "action": "Auto-refresh on every keystroke",
+        "whyBad": "Caused 500+ API calls in 1 hour, cost spike, rate limiting",
+        "saferAlternative": "Explicit Retrieve button with debounced preview"
+      }
+    },
+    {
+      "kind": "episodic",
+      "polarity": "positive",
+      "title": "Session 2024-12-20: Neo4j case-based retrieval improved agent accuracy",
+      "content": "Switched from simple keyword search to Neo4j case-based reasoning with symptom matching. Agent accuracy on similar issues improved from 60% to 85%. Users reported more relevant suggestions. Feedback loop reinforced useful memories.",
+      "tags": [
+        "neo4j",
+        "case-based-reasoning",
+        "agent-memory",
+        "accuracy",
+        "success"
+      ],
+      "confidence": 0.9,
+      "episode": {
+        "when": "2024-12-20T09:00:00Z",
+        "where": "Agent memory system upgrade",
+        "who": "Development team",
+        "what": "Migrated to Neo4j case-based reasoning",
+        "outcome": "Agent accuracy improved from 60% to 85%"
+      }
+    },
+    {
+      "kind": "episodic",
+      "polarity": "negative",
+      "title": "Session 2024-12-05: Toast-only errors caused 40% form abandonment",
+      "content": "Analytics showed 40% of users abandoned the form after validation errors. Investigation revealed errors were shown only in dismissible toasts. Users missed them or couldn't find which field was invalid. Added inline errors and summary, abandonment dropped to 12%.",
+      "tags": [
+        "validation",
+        "ux",
+        "analytics",
+        "forms",
+        "anti-pattern"
+      ],
+      "confidence": 0.93,
+      "episode": {
+        "when": "2024-12-05T11:30:00Z",
+        "where": "Form analytics review",
+        "who": "UX team",
+        "what": "Toast-only errors caused 40% abandonment",
+        "outcome": "Added inline errors, abandonment dropped to 12%"
+      },
+      "antiPattern": {
+        "action": "Show validation errors only in toasts",
+        "whyBad": "40% form abandonment, users couldn't find invalid fields",
+        "saferAlternative": "Inline errors + summary + focus first invalid field"
+      }
+    },
+    {
+      "kind": "procedural",
+      "polarity": "positive",
+      "title": "Fix npm EACCES permission denied on macOS",
+      "content": "When npm install fails with EACCES permission denied, the issue is usually global npm directory ownership. Fix by changing npm's default directory to a user-owned location: mkdir ~/.npm-global && npm config set prefix '~/.npm-global' && add export PATH=~/.npm-global/bin:$PATH to ~/.zshrc or ~/.bash_profile. Never use sudo with npm.",
+      "tags": [
+        "npm",
+        "macos",
+        "permissions",
+        "EACCES",
+        "node_modules",
+        "troubleshooting"
+      ],
+      "confidence": 0.95,
+      "triage": {
+        "symptoms": [
+          "EACCES",
+          "permission denied",
+          "npm install fails",
+          "node_modules"
+        ],
+        "likelyCauses": [
+          "Global npm directory owned by root",
+          "Previous sudo npm install",
+          "System-wide Node.js installation"
+        ],
+        "verificationSteps": [
+          "Run: npm config get prefix (if /usr/local, that's the issue)",
+          "Run: ls -la $(npm config get prefix) (check ownership)",
+          "Check if using sudo with npm (never do this)"
+        ],
+        "fixSteps": [
+          "Create user-owned npm directory: mkdir ~/.npm-global",
+          "Configure npm to use it: npm config set prefix '~/.npm-global'",
+          "Add to PATH: echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.zshrc",
+          "Reload shell: source ~/.zshrc",
+          "Retry npm install without sudo"
+        ],
+        "gotchas": [
+          "Don't use sudo npm - it creates permission issues",
+          "If using nvm, this is already handled",
+          "May need to reinstall global packages after changing prefix"
+        ]
+      }
+    },
+    {
+      "kind": "episodic",
+      "polarity": "positive",
+      "title": "Session 2024-12-22: Resolved npm EACCES by changing npm prefix",
+      "content": "User reported 'EACCES: permission denied' when running npm install on macOS. Investigation showed npm prefix was /usr/local (root-owned). Changed npm prefix to ~/.npm-global and updated PATH. User confirmed npm install now works without sudo. Took 10 minutes to resolve.",
+      "tags": [
+        "npm",
+        "macos",
+        "EACCES",
+        "permissions",
+        "node_modules",
+        "success"
+      ],
+      "confidence": 0.94,
+      "episode": {
+        "when": "2024-12-22T14:15:00Z",
+        "where": "Support session",
+        "who": "User on macOS Sonoma",
+        "what": "npm install failed with EACCES permission denied",
+        "outcome": "Changed npm prefix to user directory, issue resolved"
+      }
+    },
+    {
+      "kind": "semantic",
+      "polarity": "negative",
+      "title": "Anti-pattern: Using sudo with npm on macOS/Linux",
+      "content": "Running npm with sudo (sudo npm install) creates permission issues because installed packages become root-owned. This leads to EACCES errors on subsequent installs. Always configure npm to use a user-owned directory instead.",
+      "tags": [
+        "npm",
+        "sudo",
+        "anti-pattern",
+        "permissions",
+        "macos",
+        "linux"
+      ],
+      "confidence": 0.96,
+      "antiPattern": {
+        "action": "Using sudo npm install to bypass permission errors",
+        "whyBad": "Creates root-owned files in node_modules, causes cascading permission issues, security risk",
+        "saferAlternative": "Configure npm prefix to user directory: npm config set prefix '~/.npm-global'"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "case_ui_prompt_builder_001",
+      "title": "Users unsure what context will be sent to the agent",
+      "summary": "Users were confused about what information would be included when running the agent, leading to uncertainty and hesitation.",
+      "outcome": "resolved",
+      "symptoms": ["unclear ui", "user confusion", "context visibility"],
+      "env": { "os": "any", "ci": false, "container": false },
+      "resolvedByMemoryIds": [
+        "mem_prompt_builder_layout",
+        "mem_ux_progressive_disclosure",
+        "mem_primary_cta"
+      ],
+      "negativeMemoryIds": [
+        "mem_antipattern_autorun_keystroke"
+      ]
+    },
+    {
+      "id": "case_ui_errors_001",
+      "title": "Validation errors missed due to toast-only UI",
+      "summary": "Form validation errors shown only in dismissible toasts led to 40% form abandonment as users missed critical feedback.",
+      "outcome": "resolved",
+      "symptoms": ["form errors", "toast notifications", "user abandonment", "validation"],
+      "env": { "os": "any", "ci": false, "container": false },
+      "resolvedByMemoryIds": [
+        "mem_async_ui_states",
+        "mem_a11y_semantic_html"
+      ],
+      "negativeMemoryIds": [
+        "mem_antipattern_toast_only_errors",
+        "mem_episode_toast_abandonment"
+      ]
+    },
+    {
+      "id": "case_react19_hydration_001",
+      "title": "React 19 hydration mismatch in production",
+      "summary": "Hydration errors appeared in production due to server/client timestamp mismatches in React 19.",
+      "outcome": "resolved",
+      "symptoms": ["hydration error", "react 19", "timestamp mismatch", "production error"],
+      "env": { "os": "any", "ci": false, "container": false, "nodeVersion": "20" },
+      "resolvedByMemoryIds": [
+        "mem_episode_hydration_fix"
+      ],
+      "negativeMemoryIds": []
+    },
+    {
+      "id": "case_auto_refresh_cost_001",
+      "title": "Auto-refresh caused API cost spike",
+      "summary": "Automatic UI refresh on every keystroke generated 500+ unnecessary API calls, causing cost spike and poor UX.",
+      "outcome": "resolved",
+      "symptoms": ["api cost", "auto refresh", "performance", "unnecessary calls"],
+      "env": { "os": "any", "ci": false, "container": false },
+      "resolvedByMemoryIds": [
+        "mem_prompt_builder_layout"
+      ],
+      "negativeMemoryIds": [
+        "mem_antipattern_autorun_keystroke",
+        "mem_episode_autorefresh_cost_spike"
+      ]
+    },
+    {
+      "id": "case_chip_keyboard_ux_001",
+      "title": "Chip input lacked keyboard shortcuts",
+      "summary": "Users struggled with chip/tag input component due to missing keyboard shortcuts for common actions.",
+      "outcome": "resolved",
+      "symptoms": ["keyboard navigation", "chip input", "ux issue", "accessibility"],
+      "env": { "os": "any", "ci": false, "container": false },
+      "resolvedByMemoryIds": [
+        "mem_react_chip_filters",
+        "mem_episode_chip_testing"
+      ],
+      "negativeMemoryIds": []
+    },
+    {
+      "id": "case_npm_eacces_macos_001",
+      "title": "npm install fails with EACCES permission denied on macOS",
+      "summary": "npm install commands fail with EACCES permission errors on macOS due to incorrect npm prefix configuration.",
+      "outcome": "resolved",
+      "symptoms": ["eacces", "permission denied", "npm install", "macos"],
+      "env": { "os": "macos", "ci": false, "container": false, "packageManager": "npm" },
+      "resolvedByMemoryIds": [
+        "mem_fix_npm_eacces_macos",
+        "mem_episode_npm_eacces_resolved"
+      ],
+      "negativeMemoryIds": [
+        "mem_antipattern_sudo_npm"
+      ]
+    }
+  ]
+}

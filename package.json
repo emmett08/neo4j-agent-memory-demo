@@ -1,0 +1,30 @@
+{
+  "name": "neo4j-agent-memory-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm -ws run build",
+    "dev": "npm -w apps/demo-api run dev",
+    "lint": "npm -ws run lint",
+    "test": "npm -ws run test",
+    "setup": "npm install && npm run build && npm run db:seed",
+    "db:start": "docker compose up -d",
+    "db:stop": "docker compose down",
+    "db:seed": "npm -w apps/demo-api run seed",
+    "db:check": "tsx --env-file=apps/demo-api/.env apps/demo-api/src/check_db.ts",
+    "start": "npm run db:start && npm run dev",
+    "start:all": "npm run db:start && concurrently -n \"API,UI\" -c \"blue,magenta\" \"npm run dev\" \"npm run dev:ui\"",
+    "dev:ui": "npm -w apps/demo-ui run dev",
+    "clean": "rm -rf node_modules packages/*/node_modules apps/*/node_modules packages/*/dist apps/*/dist"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "tsup": "^8.1.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "npm@10.9.0"
+}
