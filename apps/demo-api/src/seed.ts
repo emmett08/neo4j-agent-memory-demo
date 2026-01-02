@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createMemoryService, type LearningCandidate, type CaseRecord } from "neo4j-agent-memory";
+import { createMemoryService, type LearningCandidate, type CaseRecord } from "@emmett08/neo4j-agent-memory";
+import { exitWithError } from "./utils/errors.js";
 
 function envOrThrow(name: string): string {
   const v = process.env[name];
@@ -119,7 +120,4 @@ async function main() {
   console.log("Done!");
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main().catch(exitWithError);

@@ -1,4 +1,5 @@
 import neo4j from "neo4j-driver";
+import { exitWithError } from "./utils/errors.js";
 
 function envOrThrow(name: string): string {
   const v = process.env[name];
@@ -24,5 +25,4 @@ async function main() {
   }
 }
 
-main().catch(console.error);
-
+main().catch(exitWithError);

@@ -1,6 +1,6 @@
 import express from "express";
 import { z } from "zod/v3";
-import { createMemoryService } from "neo4j-agent-memory";
+import { createMemoryService } from "@emmett08/neo4j-agent-memory";
 import { tool } from "ai";
 import { Auggie } from "@augmentcode/auggie-sdk";
 
