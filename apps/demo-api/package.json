@@ -6,7 +6,7 @@
     "dev": "npx tsx --env-file=.env src/server.ts",
     "build": "echo \"(demo build stub)\"",
     "lint": "echo \"(lint stub)\"",
-    "test": "tsx --test test/*.test.ts",
+    "test": "tsx --test test/index.ts",
     "seed": "npx tsx --env-file=.env src/seed.ts"
   },
   "dependencies": {
