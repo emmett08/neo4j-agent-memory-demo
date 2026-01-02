@@ -18,6 +18,7 @@
     "src/ui/viz/influenceMath.ts",
     "src/state/appState.ts",
     "test/influenceMath.test.ts",
-    "test/appState.test.ts"
+    "test/appState.test.ts",
+    "test/index.ts"
   ]
 }
