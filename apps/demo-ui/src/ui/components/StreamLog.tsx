@@ -10,6 +10,10 @@ export function StreamLog({ events }: { events: AgentStreamEvent[] }) {
           if (e.type === "tool_call") return <div key={idx}>🔧 tool_call: {e.title}</div>;
           if (e.type === "tool_call_update") return <div key={idx}>… tool_update: {e.title}</div>;
           if (e.type === "final") return <div key={idx}>✅ final ({Math.round(e.durationMs)}ms)</div>;
+          if (e.type === "memory_event") {
+            const meta = e.event.meta ? JSON.stringify(e.event.meta) : "";
+            return <div key={idx}>🧠 {e.event.type}: {e.event.action} {meta}</div>;
+          }
           return (
             <div key={idx} style={{ color: "var(--danger)" }}>
               ⛔ error: {e.message}

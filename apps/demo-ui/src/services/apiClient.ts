@@ -1,4 +1,10 @@
-import type { AgentStreamEvent, EnvironmentFingerprint, ContextBundle } from "../domain/types";
+import type {
+  AgentStreamEvent,
+  EnvironmentFingerprint,
+  ContextBundle,
+  MemoryKind,
+  MemorySummary,
+} from "../domain/types";
 
 export interface RunAgentRequest {
   agentId: string;
@@ -27,6 +33,12 @@ export interface SubmitFeedbackRequest {
   usefulIds?: string[];
   notUsefulIds?: string[];
   preventedErrorIds?: string[];
+}
+
+export interface ListMemoriesRequest {
+  agentId?: string;
+  limit?: number;
+  kind?: MemoryKind;
 }
 
 /**
@@ -60,6 +72,76 @@ export class ApiClient {
       throw new Error(err.error || `Feedback failed: ${r.status}`);
     }
     return r.json();
+  }
+
+  async listMemories(req: ListMemoriesRequest = {}): Promise<MemorySummary[]> {
+    const r = await fetch(`${this.baseUrl}/memory/list`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+      throw new Error(err.error || `List failed: ${r.status}`);
+    }
+    const body = await r.json();
+    return body.items ?? [];
+  }
+
+  async listSkills(req: Omit<ListMemoriesRequest, "kind"> = {}): Promise<MemorySummary[]> {
+    const r = await fetch(`${this.baseUrl}/memory/skills`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+      throw new Error(err.error || `List skills failed: ${r.status}`);
+    }
+    const body = await r.json();
+    return body.items ?? [];
+  }
+
+  async listConcepts(req: Omit<ListMemoriesRequest, "kind"> = {}): Promise<MemorySummary[]> {
+    const r = await fetch(`${this.baseUrl}/memory/concepts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+      throw new Error(err.error || `List concepts failed: ${r.status}`);
+    }
+    const body = await r.json();
+    return body.items ?? [];
+  }
+
+  async listEpisodes(req: Omit<ListMemoriesRequest, "kind"> = {}): Promise<MemorySummary[]> {
+    const r = await fetch(`${this.baseUrl}/memory/episodes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+      throw new Error(err.error || `List episodes failed: ${r.status}`);
+    }
+    const body = await r.json();
+    return body.items ?? [];
+  }
+
+  async listPatterns(req: Omit<ListMemoriesRequest, "kind"> = {}): Promise<MemorySummary[]> {
+    const r = await fetch(`${this.baseUrl}/memory/patterns`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+      throw new Error(err.error || `List patterns failed: ${r.status}`);
+    }
+    const body = await r.json();
+    return body.items ?? [];
   }
 
   async runAgentStream(
