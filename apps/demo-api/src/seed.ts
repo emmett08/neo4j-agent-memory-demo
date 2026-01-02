@@ -107,7 +107,8 @@ async function main() {
       cc.resolvedByMemoryIds = episodic3 ? [episodic3] : [];
     }
     if (cc.id === "case_npm_eacces_macos_001") {
-      cc.resolvedByMemoryIds = [npmFix, npmEpisode].filter(Boolean);
+      const resolved = [npmFix, npmEpisode].filter((id): id is string => Boolean(id));
+      cc.resolvedByMemoryIds = resolved;
       cc.negativeMemoryIds = npmAntiPattern ? [npmAntiPattern] : [];
     }
     console.log(`Upserting case: ${cc.id}`);
