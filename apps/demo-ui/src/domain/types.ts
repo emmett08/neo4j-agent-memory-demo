@@ -35,6 +35,18 @@ export interface Memory {
   edgeAfter?: BetaEdge;
 }
 
+export interface MemorySummary {
+  id: string;
+  kind: MemoryKind;
+  polarity: MemoryPolarity;
+  title: string;
+  tags: string[];
+  confidence: number;
+  utility: number;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
 export interface ContextBundle {
   sessionId: string;
   sections: {
@@ -47,8 +59,16 @@ export interface ContextBundle {
   };
 }
 
+export interface MemoryEvent {
+  type: "read" | "write";
+  action: string;
+  at: string;
+  meta?: Record<string, unknown>;
+}
+
 export type AgentStreamEvent =
   | { type: "tool_call"; title: string }
   | { type: "tool_call_update"; title: string }
   | { type: "final"; durationMs: number; answer: string }
+  | { type: "memory_event"; event: MemoryEvent }
   | { type: "error"; message: string };

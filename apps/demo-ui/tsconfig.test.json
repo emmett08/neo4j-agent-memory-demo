@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
     "lib": [
       "ES2022"
     ],
@@ -16,6 +16,8 @@
   },
   "include": [
     "src/ui/viz/influenceMath.ts",
-    "test/influenceMath.test.ts"
+    "src/state/appState.ts",
+    "test/influenceMath.test.ts",
+    "test/appState.test.ts"
   ]
 }

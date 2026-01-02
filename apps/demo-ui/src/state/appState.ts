@@ -1,6 +1,14 @@
-import type { AgentStreamEvent, EnvironmentFingerprint, ContextBundle } from "../domain/types";
+import type {
+  AgentStreamEvent,
+  EnvironmentFingerprint,
+  ContextBundle,
+  MemorySummary,
+} from "../domain/types.js";
 
 export type RequestState = "idle" | "retrieving" | "retrieved" | "running" | "error" | "done";
+export type StoredState = "idle" | "loading" | "error" | "ready";
+export type ViewMode = "run" | "stored";
+export type StoredKind = "all" | "skills" | "concepts" | "episodes" | "patterns";
 
 export interface AppState {
   prompt: string;
@@ -13,6 +21,12 @@ export interface AppState {
   events: AgentStreamEvent[];
   answer: string | null;
   error: string | null;
+
+  view: ViewMode;
+  storedKind: StoredKind;
+  storedItems: MemorySummary[];
+  storedStatus: StoredState;
+  storedError: string | null;
 }
 
 export type AppAction =
@@ -25,6 +39,11 @@ export type AppAction =
   | { type: "retrieve_error"; error: string }
   | { type: "start" }
   | { type: "event"; event: AgentStreamEvent }
+  | { type: "set_view"; view: ViewMode }
+  | { type: "set_stored_kind"; kind: StoredKind }
+  | { type: "stored_start" }
+  | { type: "stored_success"; items: MemorySummary[] }
+  | { type: "stored_error"; error: string }
   | { type: "reset" }
   | { type: "dismiss_error" };
 
@@ -38,6 +57,11 @@ export const initialState: AppState = {
   events: [],
   answer: null,
   error: null,
+  view: "run",
+  storedKind: "all",
+  storedItems: [],
+  storedStatus: "idle",
+  storedError: null,
 };
 
 export function reducer(state: AppState, action: AppAction): AppState {
@@ -68,6 +92,16 @@ export function reducer(state: AppState, action: AppAction): AppState {
       }
       return { ...state, events: nextEvents };
     }
+    case "set_view":
+      return { ...state, view: action.view };
+    case "set_stored_kind":
+      return { ...state, storedKind: action.kind };
+    case "stored_start":
+      return { ...state, storedStatus: "loading", storedError: null };
+    case "stored_success":
+      return { ...state, storedStatus: "ready", storedItems: action.items, storedError: null };
+    case "stored_error":
+      return { ...state, storedStatus: "error", storedError: action.error };
     case "reset":
       return { ...initialState, prompt: state.prompt };
     case "dismiss_error":

@@ -238,6 +238,40 @@ body{
   pointer-events: auto;
 }
 
+.storedList{
+  display:grid;
+  gap:10px;
+  margin-top: 10px;
+}
+.storedItem{
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.18);
+}
+.storedItem:hover{ border-color: rgba(125,211,252,.30); }
+.storedNegative{ border-color: rgba(251,113,133,.35); }
+.storedTop{ display:flex; flex-direction:column; gap:4px; }
+.storedTitle{ font-weight:700; font-size:13px; }
+.storedMeta{ font-size:12px; color: var(--muted); }
+.storedBottom{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top: 8px;
+}
+.storedTags{ display:flex; flex-wrap:wrap; gap:6px; }
+.storedTag{
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:2px 8px;
+  color: var(--muted);
+  font-size:11px;
+  background: rgba(0,0,0,.2);
+}
+.storedStats{ color: var(--muted); font-size:12px; }
+
 .tooltipGrid{ display: grid; gap: 6px; }
 .tooltipHead{ font-weight: 800; margin-bottom: 4px; }
 .tooltipRow{ display:flex; justify-content: space-between; gap: 10px; }

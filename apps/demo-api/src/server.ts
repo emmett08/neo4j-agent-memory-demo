@@ -1,8 +1,10 @@
 import express from "express";
+import { randomUUID } from "node:crypto";
 import { z } from "zod/v3";
-import { createMemoryService } from "@emmett08/neo4j-agent-memory";
+import { createMemoryService, createMemoryTools, type MemoryEvent } from "@emmett08/neo4j-agent-memory";
 import { tool } from "ai";
 import { Auggie } from "@augmentcode/auggie-sdk";
+import { listBaseSchema, listSchema, filterPatterns } from "./memory_routes.js";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -15,11 +17,30 @@ function envOrThrow(name: string): string {
   return v;
 }
 
+type MemoryEventListener = (event: MemoryEvent) => void;
+
+const memoryEventListeners = new Set<MemoryEventListener>();
+
+function addMemoryEventListener(listener: MemoryEventListener): () => void {
+  memoryEventListeners.add(listener);
+  return () => memoryEventListeners.delete(listener);
+}
+
+memoryEventListeners.add((event) => {
+  const meta = event.meta ? JSON.stringify(event.meta) : "";
+  console.log(`[MEMORY:${event.type}] ${event.action} ${meta}`);
+});
+
 const memPromise = createMemoryService({
   neo4j: {
     uri: envOrThrow("NEO4J_URI"),
     username: envOrThrow("NEO4J_USER"),
     password: envOrThrow("NEO4J_PASSWORD"),
+  },
+  onMemoryEvent: (event) => {
+    for (const listener of memoryEventListeners) {
+      listener(event);
+    }
   },
 });
 
@@ -95,6 +116,61 @@ app.post("/memory/feedback", async (req, res) => {
   }
 });
 
+app.post("/memory/list", async (req, res) => {
+  try {
+    const body = listSchema.parse(req.body);
+    const mem = await memPromise;
+    const items = await mem.listMemories(body);
+    res.json({ items });
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? String(e) });
+  }
+});
+
+app.post("/memory/skills", async (req, res) => {
+  try {
+    const body = listBaseSchema.parse(req.body);
+    const mem = await memPromise;
+    const items = await mem.listSkills(body);
+    res.json({ items });
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? String(e) });
+  }
+});
+
+app.post("/memory/concepts", async (req, res) => {
+  try {
+    const body = listBaseSchema.parse(req.body);
+    const mem = await memPromise;
+    const items = await mem.listConcepts(body);
+    res.json({ items });
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? String(e) });
+  }
+});
+
+app.post("/memory/episodes", async (req, res) => {
+  try {
+    const body = listBaseSchema.parse(req.body);
+    const mem = await memPromise;
+    const items = await mem.listEpisodes(body);
+    res.json({ items });
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? String(e) });
+  }
+});
+
+app.post("/memory/patterns", async (req, res) => {
+  try {
+    const body = listBaseSchema.parse(req.body);
+    const mem = await memPromise;
+    const items = await mem.listConcepts(body);
+    res.json({ items: filterPatterns(items) });
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? String(e) });
+  }
+});
+
 const runSchema = z.object({
   agentId: z.string().default("auggie"),
   prompt: z.string(),
@@ -106,6 +182,7 @@ const runSchema = z.object({
 const agentRunHandler = async (req: express.Request, res: express.Response) => {
   const body = runSchema.parse(req.body);
   const mem = await memPromise;
+  const runId = `run_${randomUUID()}`;
 
   // tools: allow mid-run memory retrieval and saving
   const memory_get_context = tool({
@@ -297,6 +374,20 @@ const agentRunHandler = async (req: express.Request, res: express.Response) => {
   });
 
   const model = process.env.AUGGIE_MODEL ?? "sonnet4.5";
+  const memoryToolDefs = createMemoryTools(mem);
+  const toolRegistry: Record<string, any> = {
+    memory_get_context,
+    memory_feedback,
+    memory_extract_and_save,
+  };
+
+  for (const def of Object.values(memoryToolDefs)) {
+    toolRegistry[def.name] = tool({
+      description: def.description,
+      inputSchema: def.inputSchema as any,
+      execute: def.execute,
+    });
+  }
 
   // Support multiple authentication methods:
   // 1. Direct API key via AUGMENT_API_TOKEN env var (recommended)
@@ -316,11 +407,7 @@ const agentRunHandler = async (req: express.Request, res: express.Response) => {
 
   const client = await Auggie.create({
     ...authConfig,
-    tools: {
-      memory_get_context,
-      memory_feedback,
-      memory_extract_and_save,
-    },
+    tools: toolRegistry,
     // Disable web-search to force the agent to use memory tools instead of searching for documentation
     excludedTools: ["web-search"],
   });
@@ -340,6 +427,8 @@ const agentRunHandler = async (req: express.Request, res: express.Response) => {
   const send = (obj: any) => {
     res.write(JSON.stringify(obj) + "\n");
   };
+
+  const unsubscribe = addMemoryEventListener((event) => send({ type: "memory_event", event }));
 
   client.onSessionUpdate((event: any) => {
     // Debug logging to see all events
@@ -418,6 +507,11 @@ WORKFLOW:
       - semantic: Invariants and rules
       - negative: Anti-patterns with polarity="negative" and antiPattern object
 
+Optional tools (use only if needed):
+- recall_skills / recall_concepts / recall_patterns to list stored items
+- store_skill / store_concept / store_pattern to store a single item
+- relate_concepts to link two concepts
+
 Task: ${body.prompt}`;
 
   // console.log("[SYSTEM_PROMPT]", system);
@@ -434,12 +528,57 @@ Task: ${body.prompt}`;
     const durationMs = Date.now() - start;
     send({ type: "final", durationMs, answer });
     console.log("[FINAL_EVENT_SENT]", new Date().toISOString());
+
+    await Promise.allSettled([
+      mem.captureEpisode({
+        agentId: body.agentId,
+        runId,
+        workflowName: "agent-run",
+        prompt: body.prompt,
+        response: answer,
+        outcome: "success",
+        tags: body.tags,
+      }),
+      mem.captureStepEpisode({
+        agentId: body.agentId,
+        runId,
+        workflowName: "agent-run",
+        stepName: "completion",
+        prompt: body.prompt,
+        response: answer,
+        outcome: "success",
+        tags: body.tags,
+      }),
+    ]);
   } catch (e: any) {
     console.log("[ERROR]", e);
     send({ type: "error", message: e?.message ?? String(e) });
+
+    await Promise.allSettled([
+      mem.captureEpisode({
+        agentId: body.agentId,
+        runId,
+        workflowName: "agent-run",
+        prompt: body.prompt,
+        response: e?.message ?? String(e),
+        outcome: "failure",
+        tags: body.tags,
+      }),
+      mem.captureStepEpisode({
+        agentId: body.agentId,
+        runId,
+        workflowName: "agent-run",
+        stepName: "completion",
+        prompt: body.prompt,
+        response: e?.message ?? String(e),
+        outcome: "failure",
+        tags: body.tags,
+      }),
+    ]);
   } finally {
     console.log("[CLEANUP_START]", new Date().toISOString());
     await client.close();
+    unsubscribe();
     res.end();
     console.log("[CLEANUP_COMPLETE]", new Date().toISOString());
   }

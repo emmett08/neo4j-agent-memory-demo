@@ -6,7 +6,8 @@ import { Toggle } from "./components/Toggle";
 import { StreamLog } from "./components/StreamLog";
 import { AnswerPanel } from "./components/AnswerPanel";
 import { ContextPreview } from "./components/ContextPreview";
-import { initialState, reducer } from "../state/appState";
+import { SegmentedControl } from "./components/SegmentedControl";
+import { initialState, reducer, type StoredKind, type ViewMode } from "../state/appState";
 import type { EnvironmentFingerprint } from "../domain/types";
 
 type OS = "macos" | "linux" | "windows";
@@ -37,17 +38,61 @@ export function App() {
   const busy = running || retrieving;
 
   function buildBaseline(bundle: any): Record<string, { a: number; b: number }> {
-  const out: Record<string, { a: number; b: number }> = {};
-  if (!bundle?.sections) return out;
-  const all = [...(bundle.sections.fix ?? []), ...(bundle.sections.doNotDo ?? [])];
-  for (const m of all) {
-    const edge = m.edgeAfter ?? m.edgeBefore;
-    if (edge && typeof edge.a === "number" && typeof edge.b === "number") {
-      out[m.id] = { a: edge.a, b: edge.b };
+    const out: Record<string, { a: number; b: number }> = {};
+    if (!bundle?.sections) return out;
+    const all = [...(bundle.sections.fix ?? []), ...(bundle.sections.doNotDo ?? [])];
+    for (const m of all) {
+      const edge = m.edgeAfter ?? m.edgeBefore;
+      if (edge && typeof edge.a === "number" && typeof edge.b === "number") {
+        out[m.id] = { a: edge.a, b: edge.b };
+      }
     }
+    return out;
   }
-  return out;
-}
+
+  function formatTimestamp(value?: string | null): string {
+    if (!value) return "unknown";
+    const ts = new Date(value);
+    if (Number.isNaN(ts.getTime())) return "unknown";
+    return ts.toLocaleString();
+  }
+
+  const viewOptions = [
+    { value: "run", label: "Run" },
+    { value: "stored", label: "Stored" },
+  ] as const;
+
+  const storedKindOptions = [
+    { value: "all", label: "All" },
+    { value: "skills", label: "Skills" },
+    { value: "concepts", label: "Concepts" },
+    { value: "episodes", label: "Episodes" },
+    { value: "patterns", label: "Patterns" },
+  ] as const;
+
+  const onViewChange = (view: ViewMode) => {
+    dispatch({ type: "set_view", view });
+    if (view === "stored" && state.storedStatus === "idle") {
+      void onLoadStored(state.storedKind);
+    }
+  };
+
+  const onLoadStored = async (kind: StoredKind) => {
+    dispatch({ type: "set_stored_kind", kind });
+    dispatch({ type: "stored_start" });
+    try {
+      let items = [];
+      if (kind === "skills") items = await api.listSkills({ agentId: "auggie", limit: 50 });
+      else if (kind === "concepts") items = await api.listConcepts({ agentId: "auggie", limit: 50 });
+      else if (kind === "episodes") items = await api.listEpisodes({ agentId: "auggie", limit: 50 });
+      else if (kind === "patterns") items = await api.listPatterns({ agentId: "auggie", limit: 50 });
+      else items = await api.listMemories({ agentId: "auggie", limit: 50 });
+
+      dispatch({ type: "stored_success", items });
+    } catch (e: any) {
+      dispatch({ type: "stored_error", error: e?.message ?? String(e) });
+    }
+  };
 
 const onRetrieve = async () => {
     dispatch({ type: "retrieve_start" });
@@ -157,134 +202,209 @@ const onRetrieve = async () => {
         </div>
       </div>
 
-      <div className="grid">
-        <div className="card">
-          <div className="cardHeader">
-            <p className="cardTitle">Prompt</p>
-            <div className="row">
-              <button className="btn" type="button" onClick={() => dispatch({ type: "reset" })} disabled={busy}>
-                Reset
-              </button>
-              <button
-                className="btn"
-                type="button"
-                onClick={onRetrieve}
-                disabled={busy || state.prompt.trim().length < 10}
-              >
-                {retrieving ? "Retrieving..." : "Retrieve"}
-              </button>
-              <button
-                className="btn btnPrimary"
-                type="button"
-                onClick={onRun}
-                disabled={running || state.prompt.trim().length < 10}
-              >
-                Run agent
-              </button>
-            </div>
-          </div>
+      <div className="row" style={{ marginBottom: 14 }}>
+        <SegmentedControl<ViewMode>
+          value={state.view}
+          options={viewOptions as any}
+          onChange={onViewChange}
+          ariaLabel="Primary view"
+        />
+      </div>
 
-          <div className="cardBody">
-            <p className="label">Task prompt</p>
-            <textarea
-              className="textarea"
-              value={state.prompt}
-              onChange={(e) => dispatch({ type: "set_prompt", prompt: e.target.value })}
-              placeholder="Describe the task, include any errors/log lines."
-              aria-label="Prompt"
-            />
-
-            <div className="divider" />
-
-            <ChipInput
-              label="Tags"
-              value={state.tags}
-              onChange={(tags) => dispatch({ type: "set_tags", tags })}
-              placeholder="Add a tag and press Enter"
-              helper={
-                <>
-                  Use tags to bias memory retrieval. Example: <span className="mono">react19</span>,{" "}
-                  <span className="mono">typescript5</span>, <span className="mono">ux</span>.
-                </>
-              }
-            />
-
-            <div style={{ height: 12 }} />
-
-            <ChipInput
-              label="Symptoms / error strings"
-              value={state.symptoms}
-              onChange={(symptoms) => dispatch({ type: "set_symptoms", symptoms })}
-              placeholder="Add a symptom and press Enter"
-              helper={
-                <>
-                  Used for case-based matching (e.g. <span className="mono">EACCES</span>,{" "}
-                  <span className="mono">ENOSPC</span>).
-                </>
-              }
-            />
-
-            <div className="divider" />
-
-            <div className="row" style={{ alignItems: "flex-end" }}>
-              <SelectField<OS>
-                label="OS"
-                value={(state.env.os ?? "macos") as OS}
-                options={osOptions as any}
-                onChange={(os) => dispatch({ type: "set_env", env: mergeEnv(state.env, { os }) })}
-              />
-              <SelectField<PM>
-                label="Package manager"
-                value={(state.env.packageManager ?? "npm") as PM}
-                options={pmOptions as any}
-                onChange={(packageManager) => dispatch({ type: "set_env", env: mergeEnv(state.env, { packageManager }) })}
-              />
-              <Toggle
-                label="Container"
-                checked={Boolean(state.env.container)}
-                onChange={(container) => dispatch({ type: "set_env", env: mergeEnv(state.env, { container }) })}
-              />
-              <span className="pill" aria-hidden="true">
-                <span className="mono">Principle:</span> one obvious primary action
-              </span>
-            </div>
-
-            <div className="divider" />
-
-            <p className="cardTitle" style={{ marginBottom: 10 }}>Context Preview</p>
-            <ContextPreview bundle={state.contextBundle} retrieving={retrieving} queryTags={state.tags} onFeedback={onFeedback} />
-
-            {state.error ? (
-              <div className="toast" role="alert" aria-live="polite">
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <strong style={{ color: "var(--danger)" }}>Error</strong>
-                  <button className="btn btnDanger" type="button" onClick={() => dispatch({ type: "dismiss_error" })}>
-                    Dismiss
-                  </button>
-                </div>
-                <div className="small" style={{ marginTop: 8 }}>{state.error}</div>
+      {state.view === "run" ? (
+        <div className="grid">
+          <div className="card">
+            <div className="cardHeader">
+              <p className="cardTitle">Prompt</p>
+              <div className="row">
+                <button className="btn" type="button" onClick={() => dispatch({ type: "reset" })} disabled={busy}>
+                  Reset
+                </button>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={onRetrieve}
+                  disabled={busy || state.prompt.trim().length < 10}
+                >
+                  {retrieving ? "Retrieving..." : "Retrieve"}
+                </button>
+                <button
+                  className="btn btnPrimary"
+                  type="button"
+                  onClick={onRun}
+                  disabled={running || state.prompt.trim().length < 10}
+                >
+                  Run agent
+                </button>
               </div>
-            ) : null}
+            </div>
+
+            <div className="cardBody">
+              <p className="label">Task prompt</p>
+              <textarea
+                className="textarea"
+                value={state.prompt}
+                onChange={(e) => dispatch({ type: "set_prompt", prompt: e.target.value })}
+                placeholder="Describe the task, include any errors/log lines."
+                aria-label="Prompt"
+              />
+
+              <div className="divider" />
+
+              <ChipInput
+                label="Tags"
+                value={state.tags}
+                onChange={(tags) => dispatch({ type: "set_tags", tags })}
+                placeholder="Add a tag and press Enter"
+                helper={
+                  <>
+                    Use tags to bias memory retrieval. Example: <span className="mono">react19</span>,{" "}
+                    <span className="mono">typescript5</span>, <span className="mono">ux</span>.
+                  </>
+                }
+              />
+
+              <div style={{ height: 12 }} />
+
+              <ChipInput
+                label="Symptoms / error strings"
+                value={state.symptoms}
+                onChange={(symptoms) => dispatch({ type: "set_symptoms", symptoms })}
+                placeholder="Add a symptom and press Enter"
+                helper={
+                  <>
+                    Used for case-based matching (e.g. <span className="mono">EACCES</span>,{" "}
+                    <span className="mono">ENOSPC</span>).
+                  </>
+                }
+              />
+
+              <div className="divider" />
+
+              <div className="row" style={{ alignItems: "flex-end" }}>
+                <SelectField<OS>
+                  label="OS"
+                  value={(state.env.os ?? "macos") as OS}
+                  options={osOptions as any}
+                  onChange={(os) => dispatch({ type: "set_env", env: mergeEnv(state.env, { os }) })}
+                />
+                <SelectField<PM>
+                  label="Package manager"
+                  value={(state.env.packageManager ?? "npm") as PM}
+                  options={pmOptions as any}
+                  onChange={(packageManager) => dispatch({ type: "set_env", env: mergeEnv(state.env, { packageManager }) })}
+                />
+                <Toggle
+                  label="Container"
+                  checked={Boolean(state.env.container)}
+                  onChange={(container) => dispatch({ type: "set_env", env: mergeEnv(state.env, { container }) })}
+                />
+                <span className="pill" aria-hidden="true">
+                  <span className="mono">Principle:</span> one obvious primary action
+                </span>
+              </div>
+
+              <div className="divider" />
+
+              <p className="cardTitle" style={{ marginBottom: 10 }}>Context Preview</p>
+              <ContextPreview bundle={state.contextBundle} retrieving={retrieving} queryTags={state.tags} onFeedback={onFeedback} />
+
+              {state.error ? (
+                <div className="toast" role="alert" aria-live="polite">
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <strong style={{ color: "var(--danger)" }}>Error</strong>
+                    <button className="btn btnDanger" type="button" onClick={() => dispatch({ type: "dismiss_error" })}>
+                      Dismiss
+                    </button>
+                  </div>
+                  <div className="small" style={{ marginTop: 8 }}>{state.error}</div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="cardHeader">
+              <p className="cardTitle">Agent progress</p>
+              <span className="badge">NDJSON stream</span>
+            </div>
+            <div className="cardBody">
+              <StreamLog events={state.events} />
+              <div className="divider" />
+              <p className="cardTitle" style={{ marginBottom: 10 }}>Answer</p>
+              <AnswerPanel answer={state.answer} />
+            </div>
           </div>
         </div>
-
-        <div className="card">
-          <div className="cardHeader">
-            <p className="cardTitle">Agent progress</p>
-            <span className="badge">NDJSON stream</span>
-          </div>
-          <div className="cardBody">
-            <StreamLog events={state.events} />
-            <div className="divider" />
-            <p className="cardTitle" style={{ marginBottom: 10 }}>Answer</p>
-            <AnswerPanel answer={state.answer} />
+      ) : (
+        <div className="grid">
+          <div className="card" style={{ gridColumn: "1 / -1" }}>
+            <div className="cardHeader">
+              <p className="cardTitle">Stored memories</p>
+              <div className="row">
+                <SegmentedControl<StoredKind>
+                  value={state.storedKind}
+                  options={storedKindOptions as any}
+                  onChange={onLoadStored}
+                  ariaLabel="Stored kind"
+                />
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => onLoadStored(state.storedKind)}
+                  disabled={state.storedStatus === "loading"}
+                >
+                  {state.storedStatus === "loading" ? "Loading..." : "Refresh"}
+                </button>
+              </div>
+            </div>
+            <div className="cardBody">
+              {state.storedStatus === "error" ? (
+                <div className="small" style={{ color: "var(--danger)" }}>
+                  {state.storedError}
+                </div>
+              ) : null}
+              {state.storedStatus !== "loading" && state.storedItems.length === 0 ? (
+                <div className="small" style={{ color: "var(--faint)" }}>
+                  No stored memories yet.
+                </div>
+              ) : null}
+              <div className="storedList">
+                {state.storedItems.map((item) => (
+                  <div key={item.id} className={`storedItem ${item.polarity === "negative" ? "storedNegative" : ""}`}>
+                    <div className="storedTop">
+                      <div className="storedTitle">{item.title}</div>
+                      <div className="storedMeta">
+                        {item.kind} • {item.polarity} • {formatTimestamp(item.updatedAt ?? item.createdAt)}
+                      </div>
+                    </div>
+                    <div className="storedBottom">
+                      <div className="storedTags">
+                        {(item.tags ?? []).map((tag) => (
+                          <span key={tag} className="storedTag mono">{tag}</span>
+                        ))}
+                      </div>
+                      <div className="storedStats mono">
+                        μ {item.confidence.toFixed(2)} • u {item.utility.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div style={{ marginTop: 14 }} className="small">
-        Tip: click "Retrieve" to preview context. After running the agent, retrieval is repeated with a baseline so you can see learning deltas (Δμ) on each memory.
-      </div>
+      {state.view === "run" ? (
+        <div style={{ marginTop: 14 }} className="small">
+          Tip: click "Retrieve" to preview context. After running the agent, retrieval is repeated with a baseline so you can see learning deltas (Δμ) on each memory.
+        </div>
+      ) : (
+        <div style={{ marginTop: 14 }} className="small">
+          Tip: “Stored” lists summarize memories without pulling full content; use tags to find patterns.
+        </div>
+      )}
     </div>
   );
 }
