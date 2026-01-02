@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 test("publish workflow includes npmjs publish step", () => {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const workflowPath = path.resolve(here, "../../../.github/workflows/publish-neo4j-agent-memory.yml");
-  const workflow = readFileSync(workflowPath, "utf8");
+  const workflow = readFileSync(workflowPath, "utf8").replace(/\r\n/g, "\n");
   const publishMatch = workflow.match(/\n  publish:\n([\s\S]*?)(?=\n  \w|\n$)/);
 
   assert.match(workflow, /workflow_run:/);
