@@ -5,6 +5,7 @@ on:
     branches: [main]
   push:
     branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
 
 jobs:
@@ -32,3 +33,26 @@ jobs:
         run: npm run test -w apps/demo-api
       - name: Test demo-ui
         run: npm run test -w apps/demo-ui
+
+  package-artifact:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+      - name: Install deps
+        run: npm ci
+      - name: Build package
+        run: npm run build -w packages/neo4j-agent-memory
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neo4j-agent-memory-package
+          path: |
+            packages/neo4j-agent-memory/dist
+            packages/neo4j-agent-memory/package.json
+            packages/neo4j-agent-memory/README.md

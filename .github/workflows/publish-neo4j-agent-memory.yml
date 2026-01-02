@@ -2,39 +2,18 @@ name: Publish neo4j-agent-memory
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
 
 permissions:
   contents: read
   packages: write
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [18.x, 20.x, 22.x]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          registry-url: "https://npm.pkg.github.com"
-          scope: "@emmett08"
-      - name: Install deps
-        run: npm ci
-      - name: Build package
-        run: npm run build -w packages/neo4j-agent-memory
-      - name: Test package
-        run: npm run test -w packages/neo4j-agent-memory
-
   publish:
     runs-on: ubuntu-latest
-    needs: build
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,12 +28,20 @@ jobs:
       - name: Verify GitHub Packages auth (non-blocking)
         run: npm whoami --registry https://npm.pkg.github.com
         continue-on-error: true
-      - name: Install deps
-        run: npm ci
-      - name: Build package
-        run: npm run build -w packages/neo4j-agent-memory
+      - name: Download package artifact
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: neo4j-agent-memory-package
+          run-id: ${{ github.event.workflow_run.id }}
+          path: .
+      - name: Build package (fallback)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          npm ci
+          npm run build -w packages/neo4j-agent-memory
       - name: Publish package
-        run: npm publish -w packages/neo4j-agent-memory
+        run: npm publish -w packages/neo4j-agent-memory --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       - name: Setup Node (npmjs)
@@ -63,6 +50,6 @@ jobs:
           node-version: "20.x"
           registry-url: "https://registry.npmjs.org"
       - name: Publish package to npmjs
-        run: npm publish -w packages/neo4j-agent-memory --access public --registry https://registry.npmjs.org
+        run: npm publish -w packages/neo4j-agent-memory --access public --registry https://registry.npmjs.org --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
