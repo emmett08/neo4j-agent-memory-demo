@@ -13,23 +13,37 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20.x"
           registry-url: "https://npm.pkg.github.com"
           scope: "@emmett08"
+      - name: Resolve tag for publish commit
+        id: publish_tag
+        run: |
+          git fetch --tags --force
+          tag="$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep '^v' | head -n 1 || true)"
+          if [ -n "$tag" ]; then
+            echo "Resolved tag: $tag"
+          else
+            echo "No v* tag resolved for publish commit."
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Auth GitHub Packages
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.publish_tag.outputs.tag != '' }}
         run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}
       - name: Verify GitHub Packages auth (non-blocking)
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.publish_tag.outputs.tag != '' }}
         run: npm whoami --registry https://npm.pkg.github.com
         continue-on-error: true
       - name: Download package artifact
-        if: ${{ github.event_name != 'workflow_dispatch' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.publish_tag.outputs.tag != '' }}
         uses: actions/download-artifact@v4
         with:
           name: neo4j-agent-memory-package
@@ -41,6 +55,7 @@ jobs:
           npm ci
           npm run build -w packages/neo4j-agent-memory
       - name: Publish package
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.publish_tag.outputs.tag != '' }}
         run: npm publish -w packages/neo4j-agent-memory --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
@@ -50,6 +65,7 @@ jobs:
           node-version: "20.x"
           registry-url: "https://registry.npmjs.org"
       - name: Publish package to npmjs
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.publish_tag.outputs.tag != '' }}
         run: npm publish -w packages/neo4j-agent-memory --access public --registry https://registry.npmjs.org --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
