@@ -1,13 +1,15 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 import { Neo4jClient } from "./neo4j/client.js";
 import { ensureSchema } from "./neo4j/schema.js";
 import type {
   MemoryServiceConfig,
+  MemoryEvent,
+  MemorySummary,
+  ListMemoriesArgs,
   RetrieveContextArgs,
   ContextBundle,
   MemoryFeedback,
+  CaptureEpisodeArgs,
+  CaptureStepEpisodeArgs,
   SaveLearningRequest,
   SaveLearningResult,
   LearningCandidate,
@@ -16,14 +18,7 @@ import type {
   CaseRecord,
 } from "./types.js";
 import { canonicaliseForHash, envHash, newId, normaliseSymptom, sha256Hex } from "./utils/hash.js";
-
-declare const __dirname: string | undefined;
-
-function loadCypher(rel: string): string {
-  const here = typeof __dirname === "string" ? __dirname : path.dirname(fileURLToPath(import.meta.url));
-  const p = path.resolve(here, "cypher", rel);
-  return readFileSync(p, "utf8");
-}
+import { cypher } from "./cypher/index.js";
 
 function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
@@ -81,17 +76,46 @@ function validateLearning(l: LearningCandidate, pol: ReturnType<typeof defaultPo
   return null;
 }
 
+function formatEpisodeContent(args: CaptureEpisodeArgs, title: string): string {
+  const lines = [
+    `Title: ${title}`,
+    `Run: ${args.runId}`,
+    `Workflow: ${args.workflowName}`,
+    `Outcome: ${args.outcome ?? "unknown"}`,
+    "",
+    "Prompt:",
+    args.prompt.trim(),
+    "",
+    "Response:",
+    args.response.trim(),
+  ];
+  return lines.join("\n");
+}
+
+function buildEpisodeLearning(args: CaptureEpisodeArgs, title: string): LearningCandidate {
+  return {
+    kind: "episodic",
+    title,
+    content: formatEpisodeContent(args, title),
+    tags: args.tags ?? [],
+    confidence: 0.7,
+  };
+}
+
 export class MemoryService {
   private client: Neo4jClient;
   private vectorIndex: string;
   private fulltextIndex: string;
   private halfLifeSeconds: number;
+  private onMemoryEvent?: MemoryServiceConfig["onMemoryEvent"];
 
-  private cyUpsertMemory = loadCypher("upsert_memory.cypher");
-  private cyUpsertCase = loadCypher("upsert_case.cypher");
-  private cyRetrieveBundle = loadCypher("retrieve_context_bundle.cypher");
-  private cyFeedbackBatch = loadCypher("feedback_batch.cypher");
-  private cyFeedbackCoUsed = loadCypher("feedback_co_used_with_batch.cypher");
+  private cyUpsertMemory = cypher.upsertMemory;
+  private cyUpsertCase = cypher.upsertCase;
+  private cyRetrieveBundle = cypher.retrieveContextBundle;
+  private cyFeedbackBatch = cypher.feedbackBatch;
+  private cyFeedbackCoUsed = cypher.feedbackCoUsed;
+  private cyListMemories = cypher.listMemories;
+  private cyRelateConcepts = cypher.relateConcepts;
   private cyGetRecallEdges = `
     UNWIND $ids AS id
     MATCH (m:Memory {id:id})
@@ -109,6 +133,7 @@ export class MemoryService {
     this.vectorIndex = cfg.vectorIndex ?? "memoryEmbedding";
     this.fulltextIndex = cfg.fulltextIndex ?? "memoryText";
     this.halfLifeSeconds = cfg.halfLifeSeconds ?? 30 * 24 * 3600;
+    this.onMemoryEvent = cfg.onMemoryEvent;
   }
 
   async init(): Promise<void> {
@@ -123,6 +148,15 @@ export class MemoryService {
     const e = env ?? {};
     if (!e.hash) e.hash = envHash(e);
     return e;
+  }
+
+  private emit(event: Omit<MemoryEvent, "at">): void {
+    if (!this.onMemoryEvent) return;
+    try {
+      this.onMemoryEvent({ ...event, at: new Date().toISOString() });
+    } catch {
+      // never allow callbacks to break core flows
+    }
   }
 
   /**
@@ -145,7 +179,9 @@ export class MemoryService {
         { h: contentHash }
       );
       if (existing.records.length > 0) {
-        return { id: existing.records[0].get("id"), deduped: true };
+        const existingId = existing.records[0].get("id");
+        this.emit({ type: "write", action: "upsertMemory.dedupe", meta: { id: existingId } });
+        return { id: existingId, deduped: true };
       }
     } finally {
       await read.close();
@@ -192,6 +228,7 @@ export class MemoryService {
           }
         );
       }
+      this.emit({ type: "write", action: "upsertMemory", meta: { id } });
       return { id, deduped: false };
     } finally {
       await write.close();
@@ -218,7 +255,9 @@ export class MemoryService {
         negativeMemoryIds: c.negativeMemoryIds ?? [],
         resolvedAtIso: c.resolvedAtIso ?? null,
       });
-      return res.records[0].get("caseId");
+      const caseId = res.records[0].get("caseId");
+      this.emit({ type: "write", action: "upsertCase", meta: { caseId } });
+      return caseId;
     } finally {
       await session.close();
     }
@@ -263,48 +302,48 @@ export class MemoryService {
         updatedAt: m.updatedAt?.toString?.() ?? null,
       }));
       const doNot = (sections.doNot ?? []).map((m: any) => ({
-  id: m.id,
-  kind: m.kind,
-  polarity: m.polarity ?? "negative",
-  title: m.title,
-  content: m.content,
-  tags: m.tags ?? [],
-  confidence: m.confidence ?? 0.7,
-  utility: m.utility ?? 0.2,
-  updatedAt: m.updatedAt?.toString?.() ?? null,
-}));
+        id: m.id,
+        kind: m.kind,
+        polarity: m.polarity ?? "negative",
+        title: m.title,
+        content: m.content,
+        tags: m.tags ?? [],
+        confidence: m.confidence ?? 0.7,
+        utility: m.utility ?? 0.2,
+        updatedAt: m.updatedAt?.toString?.() ?? null,
+      }));
 
-// Fetch current RECALLS edge posteriors for all retrieved memories (edgeAfter).
-const allIds = [...new Set([...fixes.map((x) => x.id), ...doNot.map((x) => x.id)])];
-const edgeAfter = new Map<string, any>();
-if (allIds.length > 0) {
-  const edgeRes = await session.run(this.cyGetRecallEdges, { agentId: args.agentId, ids: allIds });
-  for (const rec of edgeRes.records) {
-    const id = rec.get("id") as string;
-    edgeAfter.set(id, {
-      a: rec.get("a"),
-      b: rec.get("b"),
-      strength: rec.get("strength"),
-      evidence: rec.get("evidence"),
-      updatedAt: rec.get("updatedAt"),
-    });
-  }
-}
+      // Fetch current RECALLS edge posteriors for all retrieved memories (edgeAfter).
+      const allIds = [...new Set([...fixes.map((x) => x.id), ...doNot.map((x) => x.id)])];
+      const edgeAfter = new Map<string, any>();
+      if (allIds.length > 0) {
+        const edgeRes = await session.run(this.cyGetRecallEdges, { agentId: args.agentId, ids: allIds });
+        for (const rec of edgeRes.records) {
+          const id = rec.get("id") as string;
+          edgeAfter.set(id, {
+            a: rec.get("a"),
+            b: rec.get("b"),
+            strength: rec.get("strength"),
+            evidence: rec.get("evidence"),
+            updatedAt: rec.get("updatedAt"),
+          });
+        }
+      }
 
-// Edge before and after: use current RECALLS edges for both (no baseline tracking)
-const fixesWithEdges = fixes.map((m) => ({
-  ...m,
-  edgeBefore: toBetaEdge(edgeAfter.get(m.id)),
-  edgeAfter: undefined,
-}));
+      // Edge before and after: use current RECALLS edges for both (no baseline tracking).
+      const fixesWithEdges = fixes.map((m) => ({
+        ...m,
+        edgeBefore: toBetaEdge(edgeAfter.get(m.id)),
+        edgeAfter: undefined,
+      }));
 
-const doNotWithEdges = doNot.map((m) => ({
-  ...m,
-  edgeBefore: toBetaEdge(edgeAfter.get(m.id)),
-  edgeAfter: undefined,
-}));
+      const doNotWithEdges = doNot.map((m) => ({
+        ...m,
+        edgeBefore: toBetaEdge(edgeAfter.get(m.id)),
+        edgeAfter: undefined,
+      }));
 
-const sessionId = newId("session");
+      const sessionId = newId("session");
       const fixBlock =
         "## Recommended fixes\n" +
         fixesWithEdges
@@ -316,6 +355,12 @@ const sessionId = newId("session");
           .map((m) => `\n\n### [MEM:${m.id}] ${m.title}\n${m.content}`)
           .join("");
 
+      this.emit({
+        type: "read",
+        action: "retrieveContextBundle",
+        meta: { sessionId, fixCount: fixesWithEdges.length, doNotCount: doNotWithEdges.length },
+      });
+
       return {
         sessionId,
         sections: { fix: fixesWithEdges, doNotDo: doNotWithEdges },
@@ -324,6 +369,89 @@ const sessionId = newId("session");
     } finally {
       await session.close();
     }
+  }
+
+  async listMemories(args: ListMemoriesArgs = {}): Promise<MemorySummary[]> {
+    const session = this.client.session("READ");
+    try {
+      const res = await session.run(this.cyListMemories, {
+        kind: args.kind ?? null,
+        limit: args.limit ?? 25,
+        agentId: args.agentId ?? null,
+      });
+      const memories = (res.records[0]?.get("memories") as any[]) ?? [];
+      const summaries = memories.map((m) => ({
+        id: m.id,
+        kind: m.kind,
+        polarity: m.polarity ?? "positive",
+        title: m.title,
+        tags: m.tags ?? [],
+        confidence: m.confidence ?? 0.7,
+        utility: m.utility ?? 0.2,
+        createdAt: m.createdAt?.toString?.() ?? null,
+        updatedAt: m.updatedAt?.toString?.() ?? null,
+      }));
+      this.emit({ type: "read", action: "listMemories", meta: { count: summaries.length, kind: args.kind } });
+      return summaries;
+    } finally {
+      await session.close();
+    }
+  }
+
+  async listEpisodes(args: Omit<ListMemoriesArgs, "kind"> = {}): Promise<MemorySummary[]> {
+    return this.listMemories({ ...args, kind: "episodic" });
+  }
+
+  async listSkills(args: Omit<ListMemoriesArgs, "kind"> = {}): Promise<MemorySummary[]> {
+    return this.listMemories({ ...args, kind: "procedural" });
+  }
+
+  async listConcepts(args: Omit<ListMemoriesArgs, "kind"> = {}): Promise<MemorySummary[]> {
+    return this.listMemories({ ...args, kind: "semantic" });
+  }
+
+  async relateConcepts(args: { sourceId: string; targetId: string; weight?: number }): Promise<void> {
+    const weight = typeof args.weight === "number" ? args.weight : 0.5;
+    const session = this.client.session("WRITE");
+    try {
+      await session.run(this.cyRelateConcepts, { a: args.sourceId, b: args.targetId, weight });
+      this.emit({ type: "write", action: "relateConcepts", meta: { sourceId: args.sourceId, targetId: args.targetId } });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async captureEpisode(args: CaptureEpisodeArgs): Promise<SaveLearningResult> {
+    const title = `Episode ${args.workflowName} (${args.runId})`;
+    const learning = buildEpisodeLearning(args, title);
+    const result = await this.saveLearnings({
+      agentId: args.agentId,
+      sessionId: args.runId,
+      learnings: [learning],
+    });
+    this.emit({ type: "write", action: "captureEpisode", meta: { runId: args.runId, title } });
+    return result;
+  }
+
+  async captureStepEpisode(args: CaptureStepEpisodeArgs): Promise<SaveLearningResult> {
+    const title = `Episode ${args.workflowName} - ${args.stepName}`;
+    const base: CaptureEpisodeArgs = {
+      agentId: args.agentId,
+      runId: args.runId,
+      workflowName: args.workflowName,
+      prompt: args.prompt,
+      response: args.response,
+      outcome: args.outcome,
+      tags: args.tags,
+    };
+    const learning = buildEpisodeLearning(base, title);
+    const result = await this.saveLearnings({
+      agentId: args.agentId,
+      sessionId: args.runId,
+      learnings: [learning],
+    });
+    this.emit({ type: "write", action: "captureStepEpisode", meta: { runId: args.runId, stepName: args.stepName } });
+    return result;
   }
 
   /**
@@ -350,61 +478,62 @@ const sessionId = newId("session");
     const hallucRisk = clamp01(fb.metrics?.hallucinationRisk ?? 0.2);
 
     // Convert outcomes to a bounded usefulness signal y ∈ [0,1] and evidence weight w ≥ 0.
-// - y captures "how useful" the memory was (quality + hallucination risk)
-// - w captures "how much to trust" the signal (stronger when quality is higher)
-const baseY = clamp01(quality - 0.7 * hallucRisk);
-const w = 0.5 + 1.5 * quality; // in [0.5, 2.0] if quality∈[0,1]
+    // - y captures "how useful" the memory was (quality + hallucination risk)
+    // - w captures "how much to trust" the signal (stronger when quality is higher)
+    const baseY = clamp01(quality - 0.7 * hallucRisk);
+    const w = 0.5 + 1.5 * quality; // in [0.5, 2.0] if quality∈[0,1]
 
-// Per-memory y: useful/prevented => baseY, notUseful => 0
-const yById = new Map<string, number>();
-for (const id of used) {
-  yById.set(id, useful.has(id) ? baseY : 0.0);
-}
+    // Per-memory y: useful/prevented => baseY, notUseful => 0
+    const yById = new Map<string, number>();
+    for (const id of used) {
+      yById.set(id, useful.has(id) ? baseY : 0.0);
+    }
 
-const items = [...used].map((memoryId) => ({
-  memoryId,
-  y: yById.get(memoryId) ?? 0.0,
-  w,
-}));
-if (items.length === 0) return;
+    const items = [...used].map((memoryId) => ({
+      memoryId,
+      y: yById.get(memoryId) ?? 0.0,
+      w,
+    }));
+    if (items.length === 0) return;
 
     const session = this.client.session("WRITE");
     try {
       // ensure agent node exists
       await session.run("MERGE (a:Agent {id:$id}) RETURN a", { id: fb.agentId });
       await session.run(this.cyFeedbackBatch, {
-  agentId: fb.agentId,
-  nowIso,
-  items,
-  halfLifeSeconds: this.halfLifeSeconds,
-  aMin: 1e-3,
-  bMin: 1e-3,
-});
+        agentId: fb.agentId,
+        nowIso,
+        items,
+        halfLifeSeconds: this.halfLifeSeconds,
+        aMin: 1e-3,
+        bMin: 1e-3,
+      });
 
-// Update CO_USED_WITH edges using canonicalised unordered pairs.
-// Conservative pair usefulness: min(y_i, y_j), so a pair is "useful" only if both were.
-const ids = [...used];
-const pairs: Array<{ a: string; b: string; y: number; w: number }> = [];
-for (let i = 0; i < ids.length; i++) {
-  for (let j = i + 1; j < ids.length; j++) {
-    const a = ids[i] < ids[j] ? ids[i] : ids[j];
-    const b = ids[i] < ids[j] ? ids[j] : ids[i];
-    const yA = yById.get(a) ?? 0.0;
-    const yB = yById.get(b) ?? 0.0;
-    pairs.push({ a, b, y: Math.min(yA, yB), w });
-  }
-}
+      // Update CO_USED_WITH edges using canonicalised unordered pairs.
+      // Conservative pair usefulness: min(y_i, y_j), so a pair is "useful" only if both were.
+      const ids = [...used];
+      const pairs: Array<{ a: string; b: string; y: number; w: number }> = [];
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const a = ids[i] < ids[j] ? ids[i] : ids[j];
+          const b = ids[i] < ids[j] ? ids[j] : ids[i];
+          const yA = yById.get(a) ?? 0.0;
+          const yB = yById.get(b) ?? 0.0;
+          pairs.push({ a, b, y: Math.min(yA, yB), w });
+        }
+      }
 
-if (pairs.length > 0) {
-  await session.run(this.cyFeedbackCoUsed, {
-    nowIso,
-    pairs,
-    halfLifeSeconds: this.halfLifeSeconds,
-    aMin: 1e-3,
-    bMin: 1e-3,
-  });
-}
-} finally {
+      if (pairs.length > 0) {
+        await session.run(this.cyFeedbackCoUsed, {
+          nowIso,
+          pairs,
+          halfLifeSeconds: this.halfLifeSeconds,
+          aMin: 1e-3,
+          bMin: 1e-3,
+        });
+      }
+      this.emit({ type: "write", action: "feedback", meta: { agentId: fb.agentId, usedCount: used.size } });
+    } finally {
       await session.close();
     }
   }
@@ -473,6 +602,11 @@ if (pairs.length > 0) {
       console.log(`✅ Auto-created Case ${caseId} linking ${positiveMemoryIds.length} positive and ${negativeMemoryIds.length} negative memories to symptoms: [${uniqueSymptoms.join(', ')}]`);
     }
 
+    this.emit({
+      type: "write",
+      action: "saveLearnings",
+      meta: { savedCount: saved.length, rejectedCount: rejected.length },
+    });
     return { saved, rejected };
   }
 }
