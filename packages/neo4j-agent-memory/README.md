@@ -28,7 +28,7 @@ npm install @emmett08/neo4j-agent-memory
 Hard requirements:
 - Node.js 20+
 - Neo4j 5+
-- macOS or Linux (Windows is not supported)
+- Windows, macOS, or Linux
 
 Minimal requirements (tested):
 - Neo4j Desktop 2.1.1 (macOS) with a Neo4j 5.x database

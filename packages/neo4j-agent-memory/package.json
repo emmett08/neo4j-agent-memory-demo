@@ -1,6 +1,6 @@
 {
   "name": "@emmett08/neo4j-agent-memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -33,7 +33,8 @@
   },
   "os": [
     "darwin",
-    "linux"
+    "linux",
+    "win32"
   ],
   "dependencies": {
     "neo4j-driver": "^5.28.0",
