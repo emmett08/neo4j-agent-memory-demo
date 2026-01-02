@@ -2,14 +2,18 @@ import express from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod/v3";
 import { createMemoryService, createMemoryTools, type MemoryEvent } from "@emmett08/neo4j-agent-memory";
-import { tool } from "ai";
+import { tool, ToolLoopAgent } from "ai";
+import { openai } from "@ai-sdk/openai";
 import { Auggie } from "@augmentcode/auggie-sdk";
 import { listBaseSchema, listSchema, filterPatterns } from "./memory_routes.js";
+import { resolveAgentProvider } from "./agent_provider.js";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 
 const PORT = Number(process.env.PORT ?? 8080);
+const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
+const DEFAULT_AUGGIE_MODEL = "sonnet4.5";
 
 function envOrThrow(name: string): string {
   const v = process.env[name];
@@ -62,6 +66,8 @@ const retrieveSchema = z.object({
 });
 
 app.post("/memory/retrieve", async (req, res) => {
+  let auggieClient: Auggie | null = null;
+
   try {
     const body = retrieveSchema.parse(req.body);
     const mem = await memPromise;
@@ -373,7 +379,6 @@ const agentRunHandler = async (req: express.Request, res: express.Response) => {
     },
   });
 
-  const model = process.env.AUGGIE_MODEL ?? "sonnet4.5";
   const memoryToolDefs = createMemoryTools(mem);
   const toolRegistry: Record<string, any> = {
     memory_get_context,
@@ -388,29 +393,6 @@ const agentRunHandler = async (req: express.Request, res: express.Response) => {
       execute: def.execute,
     });
   }
-
-  // Support multiple authentication methods:
-  // 1. Direct API key via AUGMENT_API_TOKEN env var (recommended)
-  // 2. Environment variables (AUGMENT_API_TOKEN + AUGMENT_API_URL)
-  // 3. settings.json file (automatically loaded by SDK)
-  const authConfig: any = { model };
-
-  // If AUGMENT_API_TOKEN is provided, use it directly
-  if (process.env.AUGMENT_API_TOKEN) {
-    authConfig.apiKey = process.env.AUGMENT_API_TOKEN;
-    // Optionally include apiUrl if provided
-    if (process.env.AUGMENT_API_URL) {
-      authConfig.apiUrl = process.env.AUGMENT_API_URL;
-    }
-  }
-  // Otherwise, SDK will automatically try to load from settings.json
-
-  const client = await Auggie.create({
-    ...authConfig,
-    tools: toolRegistry,
-    // Disable web-search to force the agent to use memory tools instead of searching for documentation
-    excludedTools: ["web-search"],
-  });
 
   // Stream back NDJSON so the UI can show "memory progress"
   // Set headers for proper streaming (disable buffering)
@@ -430,54 +412,14 @@ const agentRunHandler = async (req: express.Request, res: express.Response) => {
 
   const unsubscribe = addMemoryEventListener((event) => send({ type: "memory_event", event }));
 
-  client.onSessionUpdate((event: any) => {
-    // Debug logging to see all events
-    const timestamp = new Date().toISOString();
-    // console.log(`[${timestamp}] [SESSION_UPDATE]`, JSON.stringify(event, null, 2));
-
-    const up = event?.update;
-    if (!up) {
-      console.log(`[${timestamp}] [WARNING] No update in event`);
-      return;
-    }
-
-    // console.log(`[${timestamp}] [UPDATE_TYPE] ${up.sessionUpdate}`);
-
-    if (up.sessionUpdate === "tool_call") {
-      // console.log(`[${timestamp}] [TOOL_CALL] ${up.title}`);
-      // console.log(`[${timestamp}] [TOOL_CALL_RAW_INPUT]`, JSON.stringify(up.rawInput));
-
-      // Check if this is a custom memory tool (with _auggie_sdk suffix)
-      const isMemoryTool = up.title && (
-        up.title.includes('memory_get_context_auggie_sdk') ||
-        up.title.includes('memory_feedback_auggie_sdk') ||
-        up.title.includes('memory_extract_and_save_auggie_sdk')
-      );
-
-      if (isMemoryTool) {
-        console.log(`[${timestamp}] [✅ CUSTOM_MEMORY_TOOL_CALLED] ${up.title}`);
-      }
-
-      send({ type: "tool_call", title: up.title });
-      // console.log(`[${timestamp}] [SENT] tool_call event to client`);
-    } else if (up.sessionUpdate === "tool_call_update") {
-      // console.log(`[${timestamp}] [TOOL_CALL_UPDATE] ${up.title}`);
-      // console.log(`[${timestamp}] [TOOL_CALL_UPDATE_RAW_OUTPUT]`, JSON.stringify(up.rawOutput));
-
-      send({ type: "tool_call_update", title: up.title });
-      // console.log(`[${timestamp}] [SENT] tool_call_update event to client`);
-    } else if (up.sessionUpdate === "agent_message_chunk") {
-      // console.log(`[${timestamp}] [AGENT_MESSAGE_CHUNK]`, up.content);
-    }
-  });
-
   const start = Date.now();
+  const providerDecision = resolveAgentProvider(process.env);
 
   const system = `You are an expert technical assistant with access to a memory system that learns from past experiences.
 
 WORKFLOW:
 
-1. FIRST: Use memory_get_context_auggie_sdk to retrieve relevant memories
+1. FIRST: Use memory_get_context (or memory_get_context_auggie_sdk if available) to retrieve relevant memories
    - agentId: "${body.agentId}"
    - prompt: "${body.prompt}"
    - symptoms: ${JSON.stringify(body.symptoms ?? [])}
@@ -492,17 +434,17 @@ WORKFLOW:
 
 2. Apply the retrieved knowledge to solve the task
    - Cite memories as [MEM:id] when using them
-   - If new symptoms appear, call memory_get_context_auggie_sdk again
+   - If new symptoms appear, call memory_get_context again
 
 3. LAST: Provide feedback and save learnings
 
-   a) Call memory_feedback_auggie_sdk with the sessionId and memory IDs:
+   a) Call memory_feedback (or memory_feedback_auggie_sdk) with the sessionId and memory IDs:
       - usedIds: All memories you referenced
       - usefulIds: Memories that helped
       - notUsefulIds: Memories that didn't help
       - preventedErrorIds: Negative memories that prevented mistakes
 
-   b) Call memory_extract_and_save_auggie_sdk with distilled learnings:
+   b) Call memory_extract_and_save (or memory_extract_and_save_auggie_sdk) with distilled learnings:
       - procedural: Include triage (symptoms, likelyCauses, verificationSteps, fixSteps, gotchas)
       - semantic: Invariants and rules
       - negative: Anti-patterns with polarity="negative" and antiPattern object
@@ -515,13 +457,160 @@ Optional tools (use only if needed):
 Task: ${body.prompt}`;
 
   // console.log("[SYSTEM_PROMPT]", system);
-  console.log("[AGENT_CONFIG] isAnswerOnly: false (explicitly set)");
-  console.log("[TOOLS_REGISTERED]", Object.keys({ memory_get_context, memory_feedback, memory_extract_and_save }));
+  console.log(`[AGENT_PROVIDER] ${providerDecision.provider} (${providerDecision.reason})`);
+  console.log("[TOOLS_REGISTERED]", Object.keys(toolRegistry));
 
   try {
+    if (providerDecision.provider === "openai") {
+      if (!process.env.OPENAI_API_KEY) {
+        send({
+          type: "error",
+          message: "OPENAI_API_KEY is missing. Set it or set AUGGIE_ENABLE=1 to use Auggie.",
+        });
+        return;
+      }
+
+      const openaiModel = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+      const agent = new ToolLoopAgent({
+        model: openai(openaiModel),
+        tools: toolRegistry,
+      });
+
+      console.log("[PROMPT_START]", new Date().toISOString());
+      const stream = await agent.stream({ prompt: system });
+      const toolCallsSeen = new Set<string>();
+      const answerParts: string[] = [];
+
+      for await (const part of stream.fullStream) {
+        if (part.type === "text-delta") {
+          answerParts.push(part.text);
+          continue;
+        }
+        if (part.type === "tool-input-start" || part.type === "tool-call") {
+          const toolName = (part as any).toolName ?? (part as any).name ?? (part as any).title ?? "tool";
+          const id = (part as any).toolCallId ?? (part as any).id ?? toolName;
+          if (!toolCallsSeen.has(id)) {
+            toolCallsSeen.add(id);
+            send({ type: "tool_call", title: toolName });
+          }
+          continue;
+        }
+        if (part.type === "tool-result") {
+          const toolName = (part as any).toolName ?? (part as any).name ?? (part as any).title ?? "tool";
+          send({ type: "tool_call_update", title: toolName });
+          continue;
+        }
+        if (part.type === "tool-error") {
+          const toolName = (part as any).toolName ?? (part as any).name ?? (part as any).title ?? "tool";
+          send({ type: "tool_call_update", title: `${toolName} (error)` });
+          continue;
+        }
+        if (part.type === "error") {
+          const message = part.error instanceof Error ? part.error.message : String(part.error);
+          send({ type: "error", message });
+        }
+      }
+
+      const answer = answerParts.join("");
+      console.log("[PROMPT_COMPLETE]", new Date().toISOString());
+      console.log("[ANSWER]", answer);
+
+      const durationMs = Date.now() - start;
+      send({ type: "final", durationMs, answer });
+      console.log("[FINAL_EVENT_SENT]", new Date().toISOString());
+
+      await Promise.allSettled([
+        mem.captureEpisode({
+          agentId: body.agentId,
+          runId,
+          workflowName: "agent-run",
+          prompt: body.prompt,
+          response: answer,
+          outcome: "success",
+          tags: body.tags,
+        }),
+        mem.captureStepEpisode({
+          agentId: body.agentId,
+          runId,
+          workflowName: "agent-run",
+          stepName: "completion",
+          prompt: body.prompt,
+          response: answer,
+          outcome: "success",
+          tags: body.tags,
+        }),
+      ]);
+      return;
+    }
+
+    const auggieModel = process.env.AUGGIE_MODEL ?? DEFAULT_AUGGIE_MODEL;
+
+    // Support multiple authentication methods:
+    // 1. Direct API key via AUGMENT_API_TOKEN env var (recommended)
+    // 2. Environment variables (AUGMENT_API_TOKEN + AUGMENT_API_URL)
+    // 3. settings.json file (automatically loaded by SDK)
+    const authConfig: any = { model: auggieModel };
+
+    // If AUGMENT_API_TOKEN is provided, use it directly
+    if (process.env.AUGMENT_API_TOKEN) {
+      authConfig.apiKey = process.env.AUGMENT_API_TOKEN;
+      // Optionally include apiUrl if provided
+      if (process.env.AUGMENT_API_URL) {
+        authConfig.apiUrl = process.env.AUGMENT_API_URL;
+      }
+    }
+    // Otherwise, SDK will automatically try to load from settings.json
+
+    auggieClient = await Auggie.create({
+      ...authConfig,
+      tools: toolRegistry,
+      // Disable web-search to force the agent to use memory tools instead of searching for documentation
+      excludedTools: ["web-search"],
+    });
+
+    auggieClient.onSessionUpdate((event: any) => {
+      // Debug logging to see all events
+      const timestamp = new Date().toISOString();
+      // console.log(`[${timestamp}] [SESSION_UPDATE]`, JSON.stringify(event, null, 2));
+
+      const up = event?.update;
+      if (!up) {
+        console.log(`[${timestamp}] [WARNING] No update in event`);
+        return;
+      }
+
+      // console.log(`[${timestamp}] [UPDATE_TYPE] ${up.sessionUpdate}`);
+
+      if (up.sessionUpdate === "tool_call") {
+        // console.log(`[${timestamp}] [TOOL_CALL] ${up.title}`);
+        // console.log(`[${timestamp}] [TOOL_CALL_RAW_INPUT]`, JSON.stringify(up.rawInput));
+
+        const isMemoryTool = up.title && (
+          up.title.includes("memory_get_context") ||
+          up.title.includes("memory_feedback") ||
+          up.title.includes("memory_extract_and_save")
+        );
+
+        if (isMemoryTool) {
+          console.log(`[${timestamp}] [✅ CUSTOM_MEMORY_TOOL_CALLED] ${up.title}`);
+        }
+
+        send({ type: "tool_call", title: up.title });
+        // console.log(`[${timestamp}] [SENT] tool_call event to client`);
+      } else if (up.sessionUpdate === "tool_call_update") {
+        // console.log(`[${timestamp}] [TOOL_CALL_UPDATE] ${up.title}`);
+        // console.log(`[${timestamp}] [TOOL_CALL_UPDATE_RAW_OUTPUT]`, JSON.stringify(up.rawOutput));
+
+        send({ type: "tool_call_update", title: up.title });
+        // console.log(`[${timestamp}] [SENT] tool_call_update event to client`);
+      } else if (up.sessionUpdate === "agent_message_chunk") {
+        // console.log(`[${timestamp}] [AGENT_MESSAGE_CHUNK]`, up.content);
+      }
+    });
+
     console.log("[PROMPT_START]", new Date().toISOString());
     // Explicitly set isAnswerOnly to false to allow tool calls
-    const answer = await client.prompt(system, { isAnswerOnly: false });
+    const answer = await auggieClient.prompt(system, { isAnswerOnly: false });
     console.log("[PROMPT_COMPLETE]", new Date().toISOString());
     console.log("[ANSWER]", answer);
 
@@ -577,7 +666,9 @@ Task: ${body.prompt}`;
     ]);
   } finally {
     console.log("[CLEANUP_START]", new Date().toISOString());
-    await client.close();
+    if (auggieClient) {
+      await auggieClient.close();
+    }
     unsubscribe();
     res.end();
     console.log("[CLEANUP_COMPLETE]", new Date().toISOString());
