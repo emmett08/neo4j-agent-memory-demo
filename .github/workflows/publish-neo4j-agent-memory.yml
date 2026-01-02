@@ -44,6 +44,11 @@ jobs:
           node-version: "20.x"
           registry-url: "https://npm.pkg.github.com"
           scope: "@emmett08"
+      - name: Auth GitHub Packages
+        run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}
+      - name: Verify GitHub Packages auth (non-blocking)
+        run: npm whoami --registry https://npm.pkg.github.com
+        continue-on-error: true
       - name: Install deps
         run: npm ci
       - name: Build package
