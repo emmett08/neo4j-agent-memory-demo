@@ -55,6 +55,18 @@ export interface MemoryRecord {
   env?: EnvironmentFingerprint; // optional applicability
 }
 
+export interface MemorySummary {
+  id: string;
+  kind: MemoryKind;
+  polarity: MemoryPolarity;
+  title: string;
+  tags: string[];
+  confidence: number;
+  utility: number;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
 export interface CaseRecord {
   id: string;
   title: string;
@@ -79,6 +91,12 @@ export interface RetrieveContextArgs {
   fixLimit?: number;
   dontLimit?: number;
   nowIso?: string;
+}
+
+export interface ListMemoriesArgs {
+  kind?: MemoryKind;
+  limit?: number;
+  agentId?: string;
 }
 
 export interface BetaEdge {
@@ -134,6 +152,27 @@ export interface MemoryFeedback {
   notes?: string;
 }
 
+export interface CaptureEpisodeArgs {
+  agentId: string;
+  runId: string;
+  workflowName: string;
+  prompt: string;
+  response: string;
+  outcome?: "success" | "failure" | "partial" | "unknown";
+  tags?: string[];
+}
+
+export interface CaptureStepEpisodeArgs extends CaptureEpisodeArgs {
+  stepName: string;
+}
+
+export interface MemoryEvent {
+  type: "read" | "write";
+  action: string;
+  at: string;
+  meta?: Record<string, unknown>;
+}
+
 export interface LearningCandidate {
   kind: MemoryKind;
   polarity?: MemoryPolarity; // default positive
@@ -175,4 +214,23 @@ export interface MemoryServiceConfig {
   vectorIndex?: string;   // default memoryEmbedding
   fulltextIndex?: string; // default memoryText
   halfLifeSeconds?: number; // default 30 days
+  onMemoryEvent?: (event: MemoryEvent) => void;
 }
+
+export type MemoryToolName =
+  | "store_skill"
+  | "store_pattern"
+  | "store_concept"
+  | "relate_concepts"
+  | "recall_skills"
+  | "recall_concepts"
+  | "recall_patterns";
+
+export interface MemoryToolDefinition<TInput, TResult> {
+  name: MemoryToolName;
+  description: string;
+  inputSchema?: unknown;
+  execute: (input: TInput) => Promise<TResult>;
+}
+
+export type MemoryToolSet = Record<MemoryToolName, MemoryToolDefinition<any, any>>;

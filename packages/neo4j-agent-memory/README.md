@@ -26,7 +26,7 @@ npm install @emmett08/neo4j-agent-memory
 ## Requirements
 
 Hard requirements:
-- Node.js 20+
+- Node.js 18+
 - Neo4j 5+
 - Windows, macOS, or Linux
 
@@ -69,6 +69,89 @@ await mem.close();
 Notes:
 - `createMemoryService` runs schema setup on init.
 - Cypher assets are bundled at `dist/cypher` in the published package.
+
+## Tool adapter (createMemoryTools)
+
+Use the tool factory to preserve the existing tool surface used by the demo:
+
+```ts
+import { createMemoryService, createMemoryTools } from "@emmett08/neo4j-agent-memory";
+
+const mem = await createMemoryService({ neo4j: { uri, username, password } });
+const tools = createMemoryTools(mem);
+
+await tools.store_skill.execute({
+  agentId: "auggie",
+  title: "Fix npm EACCES on macOS",
+  content: "If npm fails with EACCES, chown the cache directory and retry.",
+  tags: ["npm", "macos", "permissions"],
+});
+```
+
+Tool names:
+- `store_skill`
+- `store_pattern`
+- `store_concept`
+- `relate_concepts`
+- `recall_skills`
+- `recall_concepts`
+- `recall_patterns`
+
+## Stored UI APIs
+
+List summaries for the UI without legacy Cypher:
+
+```ts
+const all = await mem.listMemories({ limit: 50 });
+const episodes = await mem.listEpisodes({ agentId: "auggie" });
+const skills = await mem.listSkills({ agentId: "auggie" });
+const concepts = await mem.listConcepts({ agentId: "auggie" });
+```
+
+## Episodic capture helpers
+
+```ts
+await mem.captureEpisode({
+  agentId: "auggie",
+  runId: "run-123",
+  workflowName: "triage",
+  prompt: "Why is npm failing?",
+  response: "We found a permissions issue.",
+  outcome: "success",
+  tags: ["npm", "triage"],
+});
+
+await mem.captureStepEpisode({
+  agentId: "auggie",
+  runId: "run-123",
+  workflowName: "triage",
+  stepName: "fix",
+  prompt: "Apply the fix",
+  response: "Ran chown and reinstalled.",
+  outcome: "success",
+});
+```
+
+## Event hooks
+
+Provide an `onMemoryEvent` callback to observe reads/writes:
+
+```ts
+const mem = await createMemoryService({
+  neo4j: { uri, username, password },
+  onMemoryEvent: (event) => {
+    console.log(`[memory:${event.type}] ${event.action}`, event.meta);
+  },
+});
+```
+
+## Schema + cypher exports
+
+Schema helpers and cypher assets are exported for integrations:
+
+```ts
+import { ensureSchema, schemaVersion, migrate, cypher } from "@emmett08/neo4j-agent-memory";
+```
 
 ## Intended usage (demo + API)
 
