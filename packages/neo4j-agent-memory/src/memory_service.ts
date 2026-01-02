@@ -17,8 +17,10 @@ import type {
 } from "./types.js";
 import { canonicaliseForHash, envHash, newId, normaliseSymptom, sha256Hex } from "./utils/hash.js";
 
+declare const __dirname: string | undefined;
+
 function loadCypher(rel: string): string {
-  const here = path.dirname(fileURLToPath(import.meta.url));
+  const here = typeof __dirname === "string" ? __dirname : path.dirname(fileURLToPath(import.meta.url));
   const p = path.resolve(here, "cypher", rel);
   return readFileSync(p, "utf8");
 }

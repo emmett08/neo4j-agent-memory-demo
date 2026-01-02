@@ -2,7 +2,8 @@
   "name": "@emmett08/neo4j-agent-memory",
   "version": "0.1.1",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "repository": {
     "type": "git",
@@ -12,7 +13,8 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
   "files": [
@@ -23,7 +25,7 @@
     "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts && cp -r src/cypher dist/",
+    "build": "tsup && cp -r src/cypher dist/",
     "prepack": "npm run build",
     "lint": "echo \"(lint stub)\"",
     "test": "node --test"
