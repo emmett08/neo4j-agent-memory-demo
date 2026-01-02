@@ -14,7 +14,7 @@
   - ✅ Hybrid retrieval (cases by symptoms+env → fix + do-not-do sections)
   - ✅ Reinforcement feedback (edge weights) + optional Beta-with-forgetting scaffold
 
-- **`apps/demo-api`** — Node + Express demo integrating **Auggie SDK** with tools for:
+- **`apps/demo-api`** — Node + Express demo using **OpenAI by default** (Auggie optional) with tools for:
   - 🔧 Mid-run memory retrieval (`memory_get_context`)
   - 💬 Feedback (`memory_feedback`)
   - 💾 Extract+save learnings (`memory_extract_and_save`)
@@ -33,7 +33,7 @@
 ```bash
 # 1. Configure environment first
 cp apps/demo-api/.env.example apps/demo-api/.env
-# Edit apps/demo-api/.env with your Auggie credentials and Neo4j settings
+# Edit apps/demo-api/.env with your OpenAI key and Neo4j settings
 
 # 2. Run the complete setup script
 ./start.sh
@@ -66,7 +66,14 @@ npm install
 
 #### 3) Configure demo-api
 
-**Option A: Automatic setup (Recommended)**
+**Option A: OpenAI (Recommended)**
+```bash
+cp apps/demo-api/.env.example apps/demo-api/.env
+# Set OPENAI_API_KEY (and optionally OPENAI_MODEL)
+# Set NEO4J_URI/USER/PASSWORD
+```
+
+**Option B: Auggie setup (Optional)**
 ```bash
 cd apps/demo-api
 cp .env.example .env
@@ -74,7 +81,7 @@ cp .env.example .env
 # Then edit .env to set NEO4J_URI/USER/PASSWORD
 ```
 
-**Option B: Manual setup**
+**Option C: Auggie manual setup**
 ```bash
 cp apps/demo-api/.env.example apps/demo-api/.env
 # Get your Auggie credentials:
@@ -83,7 +90,7 @@ auggie token print
 # Set NEO4J_URI/USER/PASSWORD
 ```
 
-**Option C: Use settings.json (no .env needed)**
+**Option D: Auggie settings.json (no token in .env)**
 The SDK will automatically load credentials from your Auggie settings.json if no environment variables are set.
 Just configure Neo4j credentials in .env:
 ```bash
@@ -306,7 +313,7 @@ The response is streamed as NDJSON with:
 - Rebuild the package: `npm run build`
 
 **Server won't start:**
-- Check that Auggie credentials are configured (see step 3)
+- Check that OpenAI (or Auggie) credentials are configured (see step 3)
 - Verify Neo4j is accessible: `docker compose ps`
 - Check logs for authentication errors
 
