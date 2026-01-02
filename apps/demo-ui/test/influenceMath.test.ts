@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mean, evidence, variance, approxCI95Range, certaintyFromEvidence } from "../src/ui/viz/influenceMath";
+import { mean, evidence, variance, approxCI95Range, certaintyFromEvidence } from "../src/ui/viz/influenceMath.js";
 
 test("mean is a/(a+b)", () => {
   assert.equal(mean({ a: 1, b: 1 }), 0.5);
