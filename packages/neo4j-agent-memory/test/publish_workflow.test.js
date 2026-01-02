@@ -16,6 +16,7 @@ test("publish workflow includes npmjs publish step", () => {
   assert.match(workflow, /registry\.npmjs\.org/);
   assert.match(workflow, /git tag --points-at/);
   assert.match(workflow, /gh api \/repos\/\$\{\{ github\.repository \}\}\/actions\/runs/);
+  assert.match(workflow, /!github\.event\.workflow_run\.head_branch/);
   assert.match(workflow, /npm whoami --registry https:\/\/npm\.pkg\.github\.com/);
   assert.match(workflow, /npm config set \/\/npm\.pkg\.github\.com\/:_authToken=/);
   assert.match(workflow, /download-artifact@v4/);
