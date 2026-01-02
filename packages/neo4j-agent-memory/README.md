@@ -8,6 +8,12 @@ A Neo4j-backed memory system for AI agents:
 - hybrid retrieval returning a ContextBundle with separate Fix / Do-not-do blocks
 - feedback API to reinforce / degrade association weights (agent affinity)
 
+## Install (npm)
+
+```bash
+npm install @emmett08/neo4j-agent-memory
+```
+
 ## Install (GitHub Packages)
 
 1) Authenticate to GitHub Packages with an npm token that can read packages.

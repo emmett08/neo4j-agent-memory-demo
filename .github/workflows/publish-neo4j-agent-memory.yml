@@ -52,3 +52,12 @@ jobs:
         run: npm publish -w packages/neo4j-agent-memory
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Node (npmjs)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          registry-url: "https://registry.npmjs.org"
+      - name: Publish package to npmjs
+        run: npm publish -w packages/neo4j-agent-memory --access public --registry https://registry.npmjs.org
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
