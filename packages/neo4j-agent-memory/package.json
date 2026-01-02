@@ -1,6 +1,6 @@
 {
   "name": "@emmett08/neo4j-agent-memory",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
