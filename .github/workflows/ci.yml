@@ -23,6 +23,8 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: Install deps
         run: npm ci
+      - name: Build package
+        run: npm run build -w packages/neo4j-agent-memory
       - name: Test package
         run: npm run test -w packages/neo4j-agent-memory
       - name: Test demo-api
