@@ -1,9 +1,14 @@
 {
-  "name": "neo4j-agent-memory",
+  "name": "@emmett08/neo4j-agent-memory",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emmett08/neo4j-agent-memory-demo.git",
+    "directory": "packages/neo4j-agent-memory"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -14,11 +19,22 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts && cp -r src/cypher dist/",
+    "prepack": "npm run build",
     "lint": "echo \"(lint stub)\"",
     "test": "node --test"
   },
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
   "dependencies": {
     "neo4j-driver": "^5.28.0",
     "zod": "^3.23.8"
