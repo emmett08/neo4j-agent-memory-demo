@@ -108,25 +108,6 @@ jobs:
           echo "Tarball: ${TARBALL}"
           echo "tarball=${TARBALL}" >> "${GITHUB_OUTPUT}"
 
-      # --- Publish to GitHub Packages ---
-      - name: Configure npm for GitHub Packages
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20.x"
-          registry-url: "https://npm.pkg.github.com"
-          scope: "@emmett08"
-
-      - name: Publish to GitHub Packages
-        env:
-          # Best practice: use GITHUB_TOKEN with packages:write if publishing in same repo/org.
-          NODE_AUTH_TOKEN: ${{ github.token }}
-          # If you ever hit 403 due to org policy, switch to a PAT:
-          # NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
-        run: |
-          npm publish "${{ steps.pack.outputs.tarball }}" \
-            --registry "https://npm.pkg.github.com" \
-            --ignore-scripts
-
       # --- Publish to npmjs ---
       - name: Configure npm for npmjs
         uses: actions/setup-node@v4

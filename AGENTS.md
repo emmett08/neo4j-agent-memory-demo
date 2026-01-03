@@ -14,6 +14,14 @@ NON-NEGOTIABLE BEHAVIOURS (unless the user explicitly says to ignore them):
      - Locate technical debt that is directly coupled to the requested change.
    - Summarise what you found and the plan you will follow BEFORE making edits.
 
+1a) Impact analysis is mandatory (find second-order effects):
+   - Before making edits, always assess blast radius beyond the immediate file(s):
+     - Identify all call sites and dependants (imports, usages, overrides, registrations, routes, CLI flags, config keys).
+     - Identify behavioural contracts that might change (types/interfaces, schemas, API responses, persistence formats, events).
+     - Identify cross-cutting touchpoints (tests, docs, metrics/logging, feature flags, migrations, CI, build scripts).
+   - Use repo-wide search to enumerate impacts (ripgrep/symbol search) and list the impacted files/modules in Findings.
+   - If impact is non-trivial, expand scope only within the chosen refactor level; otherwise document out-of-scope follow-ups.
+
 2) Debt must go down (Debt Budget Rule):
    - Every change must reduce technical debt overall.
    - Maintain an explicit “debt budget” in your output:
@@ -131,6 +139,8 @@ B) Codebase reconnaissance:
    - Identify relevant files, modules, data models, flows, and existing patterns.
    - Identify debt directly in the execution path (duplication, tight coupling, large functions/files, poor naming, missing tests).
    - Identify refactor “beneficiaries” in-scope (other call sites that should be improved if you refactor a concept).
+   - Perform an explicit "impact scan": repo-wide search for symbols/paths/config keys affected, and list the results.
+
 
 C) Produce a plan:
    - Alternatives (at least two) with pros/cons and refactor level mapping.
