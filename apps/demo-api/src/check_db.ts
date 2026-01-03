@@ -1,4 +1,4 @@
-import { createMemoryService } from "@emmett08/neo4j-agent-memory";
+import { createMemoryService } from "neo4j-agent-memory";
 import { exitWithError } from "./utils/errors.js";
 
 function envOrThrow(name: string): string {

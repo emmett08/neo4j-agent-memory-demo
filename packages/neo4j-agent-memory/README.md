@@ -1,4 +1,4 @@
-# @emmett08/neo4j-agent-memory
+# neo4j-agent-memory
 
 A Neo4j-backed memory system for AI agents:
 - semantic / procedural / episodic memories
@@ -11,7 +11,7 @@ A Neo4j-backed memory system for AI agents:
 ## Install (npm)
 
 ```bash
-npm install @emmett08/neo4j-agent-memory
+npm install neo4j-agent-memory
 ```
 
 ## Requirements
@@ -29,7 +29,7 @@ Minimal requirements (tested):
 ## Core API
 
 ```ts
-import { createMemoryService } from "@emmett08/neo4j-agent-memory";
+import { createMemoryService } from "neo4j-agent-memory";
 
 const mem = await createMemoryService({
   neo4j: { uri, username, password },
@@ -66,7 +66,7 @@ Notes:
 Use the tool factory to preserve the existing tool surface used by the demo:
 
 ```ts
-import { createMemoryService, createMemoryTools } from "@emmett08/neo4j-agent-memory";
+import { createMemoryService, createMemoryTools } from "neo4j-agent-memory";
 
 const mem = await createMemoryService({ neo4j: { uri, username, password } });
 const tools = createMemoryTools(mem);
@@ -141,7 +141,7 @@ const mem = await createMemoryService({
 Schema helpers and cypher assets are exported for integrations:
 
 ```ts
-import { ensureSchema, schemaVersion, migrate, cypher } from "@emmett08/neo4j-agent-memory";
+import { ensureSchema, schemaVersion, migrate, cypher } from "neo4j-agent-memory";
 ```
 
 ## Intended usage (demo + API)

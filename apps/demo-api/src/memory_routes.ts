@@ -1,5 +1,5 @@
 import { z } from "zod/v3";
-import type { MemorySummary } from "@emmett08/neo4j-agent-memory";
+import type { MemorySummary } from "neo4j-agent-memory";
 
 export const listBaseSchema = z.object({
   agentId: z.string().optional(),

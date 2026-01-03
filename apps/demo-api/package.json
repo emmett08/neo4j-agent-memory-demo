@@ -14,7 +14,7 @@
     "@augmentcode/auggie-sdk": "^0.1.11",
     "ai": "^6.0.3",
     "express": "^5.2.1",
-    "@emmett08/neo4j-agent-memory": "file:../../packages/neo4j-agent-memory",
+    "neo4j-agent-memory": "file:../../packages/neo4j-agent-memory",
     "zod": "^4.2.1"
   }
 }
