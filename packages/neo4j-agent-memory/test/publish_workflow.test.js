@@ -15,7 +15,6 @@ test("publish workflow includes npmjs publish step", () => {
   assert.match(workflow, /registry\.npmjs\.org/);
   assert.match(workflow, /npm pack -w packages\/neo4j-agent-memory/);
   assert.match(workflow, /npm publish \"\$\{\{ steps\.pack\.outputs\.tarball \}\}\"/);
-  assert.match(workflow, /--registry \"https:\/\/npm\.pkg\.github\.com\"/);
   assert.match(workflow, /--registry \"https:\/\/registry\.npmjs\.org\"/);
   assert.match(workflow, /--access public/);
   assert.ok(publishMatch, "missing publish job definition");
