@@ -88,6 +88,7 @@ jobs:
       - name: Publish to npmjs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: packages/neo4j-agent-memory
         run: |
           npm publish \
             --provenance \

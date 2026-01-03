@@ -13,6 +13,7 @@ test("publish workflow includes npmjs publish step", () => {
   assert.match(workflow, /name: CI & Release/);
   assert.match(workflow, /registry-url: 'https:\/\/registry\.npmjs\.org'/);
   assert.match(workflow, /NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}/);
+  assert.match(workflow, /working-directory: packages\/neo4j-agent-memory/);
   assert.match(workflow, /npm publish/);
   assert.match(workflow, /--provenance/);
   assert.match(workflow, /--access public/);
