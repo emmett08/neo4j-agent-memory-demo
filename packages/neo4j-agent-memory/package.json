@@ -1,6 +1,6 @@
 {
   "name": "@emmett08/neo4j-agent-memory",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -22,7 +22,7 @@
     "README.md"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "build": "tsup && cp -r src/cypher dist/",

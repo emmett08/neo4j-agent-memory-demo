@@ -14,21 +14,6 @@ A Neo4j-backed memory system for AI agents:
 npm install @emmett08/neo4j-agent-memory
 ```
 
-## Install (GitHub Packages)
-
-1) Authenticate to GitHub Packages with an npm token that can read packages.
-2) Add an `.npmrc` entry for the scope:
-
-```ini
-@emmett08:registry=https://npm.pkg.github.com
-```
-
-3) Install:
-
-```bash
-npm install @emmett08/neo4j-agent-memory
-```
-
 ## Requirements
 
 Hard requirements:
