@@ -54,6 +54,7 @@ dmypy.json
 coverage/
 .nyc_output/
 *.lcov
+.tmp-test/
 
 # Temporary files
 *.tmp
@@ -80,4 +81,3 @@ neo4j/logs/
 # Documentation build artifacts (keep source .md files)
 *.md.bak
 *.md.tmp
-

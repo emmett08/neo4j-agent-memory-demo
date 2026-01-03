@@ -66,8 +66,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-      # Uncomment ONLY if you later enable npm provenance/attestations via OIDC.
-      # id-token: write
+      id-token: write
 
     steps:
       - name: Checkout (full history for tags)
@@ -76,69 +75,20 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # Setup .npmrc file to publish to npmjs
       - name: Setup Node (build/pack once)
         uses: actions/setup-node@v4
         with:
           node-version: "20.x"
-          cache: npm
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install deps
         run: npm ci
 
-      - name: Validate tag matches package version
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          PKG_VERSION="$(node -p "require('./packages/neo4j-agent-memory/package.json').version")"
-          echo "Tag version: ${TAG}"
-          echo "Package version: ${PKG_VERSION}"
-          if [ "${TAG}" != "${PKG_VERSION}" ]; then
-            echo "::error::Tag v${TAG} does not match packages/neo4j-agent-memory version ${PKG_VERSION}"
-            exit 1
-          fi
-
-      - name: Build neo4j-agent-memory
-        run: npm run build -w packages/neo4j-agent-memory
-
-      - name: Pack once (single artefact published to both registries)
-        id: pack
-        run: |
-          rm -f ./*.tgz
-          npm pack -w packages/neo4j-agent-memory
-          TARBALL="$(ls -1 ./*.tgz | head -n 1)"
-          echo "Tarball: ${TARBALL}"
-          echo "tarball=${TARBALL}" >> "${GITHUB_OUTPUT}"
-
-      # # --- Publish to GitHub Packages ---
-      # - name: Configure npm for GitHub Packages
-      #   uses: actions/setup-node@v4
-      #   with:
-      #     node-version: "20.x"
-      #     registry-url: "https://npm.pkg.github.com"
-      #     scope: "@emmett08"
-
-      # - name: Publish to GitHub Packages
-      #   env:
-      #     # Best practice: use GITHUB_TOKEN with packages:write if publishing in same repo/org.
-      #     NODE_AUTH_TOKEN: ${{ github.token }}
-      #     # If you ever hit 403 due to org policy, switch to a PAT:
-      #     # NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-      #   run: |
-      #     npm publish "${{ steps.pack.outputs.tarball }}" \
-      #       --registry "https://npm.pkg.github.com" \
-      #       --ignore-scripts
-
-      # --- Publish to npmjs ---
-      - name: Configure npm for npmjs
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20.x"
-          registry-url: "https://registry.npmjs.org"
-
       - name: Publish to npmjs
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          npm publish "${{ steps.pack.outputs.tarball }}" \
-            --registry "https://registry.npmjs.org" \
-            --access public \
-            --ignore-scripts
+          npm publish \
+            --provenance \
+            --access public

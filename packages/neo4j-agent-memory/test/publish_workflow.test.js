@@ -11,11 +11,10 @@ test("publish workflow includes npmjs publish step", () => {
   const publishMatch = workflow.match(/\n  publish:\n([\s\S]*?)(?=\n  \w|\n$)/);
 
   assert.match(workflow, /name: CI & Release/);
-  assert.match(workflow, /Validate tag matches package version/);
-  assert.match(workflow, /registry\.npmjs\.org/);
-  assert.match(workflow, /npm pack -w packages\/neo4j-agent-memory/);
-  assert.match(workflow, /npm publish \"\$\{\{ steps\.pack\.outputs\.tarball \}\}\"/);
-  assert.match(workflow, /--registry \"https:\/\/registry\.npmjs\.org\"/);
+  assert.match(workflow, /registry-url: 'https:\/\/registry\.npmjs\.org'/);
+  assert.match(workflow, /NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}/);
+  assert.match(workflow, /npm publish/);
+  assert.match(workflow, /--provenance/);
   assert.match(workflow, /--access public/);
   assert.ok(publishMatch, "missing publish job definition");
   assert.match(publishMatch[0], /runs-on: ubuntu-latest/);
