@@ -1,12 +1,24 @@
 // :param {
-//   nowIso: "2026-01-04T22:00:00Z",
+//   nowIso: "2026-01-04T22:07:53.086Z",
 //   agentId: "agent-123",
 //   halfLifeSeconds: 86400,
 //   aMin: 1.0,
 //   bMin: 1.0,
 //   w: 1.0,
 //   y: 1.0,
-//   items: ["memory-456", "memory-789"]
+//   items: [
+//     "mem_8cd773c2-208c-45ad-97ea-1b2337dca751",
+//     "mem_64fbcc73-0b5c-4041-8b6b-66514ffaf1d0",
+//     "mem_e55b80e2-6156-47bc-a964-9aef596f74a6",
+//     "mem_13189119-e3ad-4769-9f2b-2d3e3b8bc07f",
+//     "mem_137c3ff7-a81d-453d-8048-5c1b736db6ca",
+//     "mem_c0ea5643-3c61-4607-ba9f-67f4c2bb01ee",
+//     "mem_aa15e7b6-7f94-445a-9c52-3eb24a315215",
+//     "mem_e93e7bb8-b43c-44f5-a5d3-87545d67be59",
+//     "mem_b81e3709-35ae-4cab-931d-612dcc2cd43d",
+//     "mem_ce8a5b62-7ddb-4618-8a6c-93ed3b425f27",
+//     "mem_737df25b-7944-4dee-a7aa-86af93567663"
+//   ]
 // }
 WITH datetime($nowIso) AS now
 
