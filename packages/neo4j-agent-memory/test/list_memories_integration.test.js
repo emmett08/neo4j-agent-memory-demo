@@ -91,3 +91,34 @@ run("get_memory_graph.cypher EXPLAINs", async () => {
     await result.consume();
   });
 });
+
+run("fallback_retrieve_memories.cypher EXPLAINs", async () => {
+  const query = readFileSync(path.join(cypherDir, "fallback_retrieve_memories.cypher"), "utf8");
+  await withSession(async (session) => {
+    const result = await session.run(`EXPLAIN ${query}`, {
+      prompt: "permission denied",
+      tags: ["npm", "permissions"],
+      kinds: ["semantic"],
+      fulltextIndex: "memoryText",
+      vectorIndex: "memoryEmbedding",
+      embedding: null,
+      useFulltext: true,
+      useVector: false,
+      useTags: true,
+      fixLimit: 5,
+      dontLimit: 3,
+    });
+    await result.consume();
+  });
+});
+
+run("list_memory_edges.cypher EXPLAINs", async () => {
+  const query = readFileSync(path.join(cypherDir, "list_memory_edges.cypher"), "utf8");
+  await withSession(async (session) => {
+    const result = await session.run(`EXPLAIN ${query}`, {
+      limit: 10,
+      minStrength: 0.2,
+    });
+    await result.consume();
+  });
+});

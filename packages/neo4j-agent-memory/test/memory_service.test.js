@@ -405,8 +405,11 @@ test("getMemoriesById returns full records", async () => {
 
 test("getMemoryGraph returns nodes and edges", async () => {
   const mem = new MemoryService(baseConfig);
+  const calls = [];
   const readSession = {
-    run: async () => ({
+    run: async (_query, params) => {
+      calls.push(params);
+      return {
       records: [
         {
           get: (key) => {
@@ -442,7 +445,8 @@ test("getMemoryGraph returns nodes and edges", async () => {
           },
         },
       ],
-    }),
+      };
+    },
     close: async () => {},
   };
 
@@ -450,8 +454,220 @@ test("getMemoryGraph returns nodes and edges", async () => {
     session: () => readSession,
   };
 
-  const res = await mem.getMemoryGraph({ agentId: "agent-1", memoryIds: ["mem-1"] });
+  const res = await mem.getMemoryGraph({ agentId: "agent-1", memoryIds: ["mem-1"], includeRelatedTo: true });
   assert.equal(res.nodes.length, 1);
   assert.equal(res.edges.length, 1);
   assert.equal(res.edges[0].kind, "recalls");
+  assert.equal(calls[0].includeRelatedTo, true);
+});
+
+test("feedback supports neutral usage without penalizing", async () => {
+  const mem = new MemoryService(baseConfig);
+  const calls = [];
+  const writeSession = {
+    run: async (_query, params) => {
+      calls.push(params);
+      if (params?.items) {
+        return {
+          records: [
+            {
+              get: (key) => {
+                if (key === "id") return "mem-1";
+                if (key === "a") return 1.5;
+                if (key === "b") return 1.5;
+                if (key === "strength") return 0.5;
+                if (key === "evidence") return 3.0;
+                if (key === "updatedAt") return "2024-01-03T00:00:00Z";
+                return undefined;
+              },
+            },
+          ],
+        };
+      }
+      return { records: [] };
+    },
+    close: async () => {},
+  };
+
+  mem.client = {
+    session: () => writeSession,
+  };
+
+  await mem.feedback({
+    agentId: "agent-1",
+    sessionId: "session-1",
+    usedIds: ["mem-1"],
+    usefulIds: [],
+    notUsefulIds: [],
+    neutralIds: ["mem-1"],
+    updateUnratedUsed: false,
+  });
+
+  const feedbackCall = calls.find((params) => Array.isArray(params?.items));
+  assert.ok(feedbackCall);
+  assert.equal(feedbackCall.items[0].y, 0.5);
+});
+
+test("retrieveContextBundle falls back when no cases exist", async () => {
+  const mem = new MemoryService(baseConfig);
+  mem.cyRetrieveBundle = "bundle";
+  mem.cyFallbackRetrieve = "fallback";
+  mem.cyGetRecallEdges = "recallEdges";
+
+  const session = {
+    run: async (query) => {
+      if (query === "bundle") {
+        return {
+          records: [
+            {
+              get: (key) => (key === "sections" ? { fixes: [], doNot: [] } : undefined),
+            },
+          ],
+        };
+      }
+      if (query === "fallback") {
+        return {
+          records: [
+            {
+              get: (key) =>
+                key === "sections"
+                  ? {
+                      fixes: [
+                        {
+                          id: "mem-1",
+                          kind: "semantic",
+                          polarity: "positive",
+                          title: "Fallback",
+                          content: "Content",
+                          tags: ["tag"],
+                          confidence: 0.8,
+                          utility: 0.3,
+                        },
+                      ],
+                      doNot: [],
+                    }
+                  : undefined,
+            },
+          ],
+        };
+      }
+      if (query === "recallEdges") {
+        return { records: [] };
+      }
+      return { records: [] };
+    },
+    close: async () => {},
+  };
+
+  mem.client = { session: () => session };
+
+  const res = await mem.retrieveContextBundle({
+    agentId: "agent-1",
+    prompt: "permission denied",
+    tags: ["npm"],
+    fallback: { enabled: true, useFulltext: false, useTags: true },
+  });
+
+  assert.equal(res.sections.fix.length, 1);
+  assert.equal(res.sections.fix[0].id, "mem-1");
+});
+
+test("retrieveContextBundleWithGraph returns bundle and graph", async () => {
+  const mem = new MemoryService(baseConfig);
+  mem.retrieveContextBundle = async () => ({
+    sessionId: "s1",
+    sections: {
+      fix: [{ id: "m1" }],
+      doNotDo: [],
+    },
+    injection: { fixBlock: "", doNotDoBlock: "" },
+  });
+  mem.getMemoryGraph = async () => ({ nodes: [], edges: [{ kind: "related_to" }] });
+
+  const res = await mem.retrieveContextBundleWithGraph({
+    agentId: "agent-1",
+    prompt: "test",
+  });
+
+  assert.equal(res.bundle.sessionId, "s1");
+  assert.equal(res.graph.edges.length, 1);
+});
+
+test("captureUsefulLearning skips save when not useful", async () => {
+  const mem = new MemoryService(baseConfig);
+  let called = false;
+
+  mem.saveLearnings = async () => {
+    called = true;
+    return { saved: [], rejected: [] };
+  };
+
+  const res = await mem.captureUsefulLearning({
+    agentId: "agent-1",
+    useful: false,
+    learning: {
+      kind: "semantic",
+      title: "Skip",
+      content: "This should not save.",
+      tags: ["tag"],
+      confidence: 0.9,
+    },
+  });
+
+  assert.equal(called, false);
+  assert.equal(res.rejected[0].reason, "not marked useful");
+});
+
+test("listMemoryEdges returns edges", async () => {
+  const mem = new MemoryService(baseConfig);
+  const session = {
+    run: async () => ({
+      records: [
+        {
+          get: (key) =>
+            key === "edges"
+              ? [
+                  {
+                    source: "m1",
+                    target: "m2",
+                    kind: "related_to",
+                    strength: 0.9,
+                    evidence: 0.0,
+                  },
+                ]
+              : undefined,
+        },
+      ],
+    }),
+    close: async () => {},
+  };
+
+  mem.client = { session: () => session };
+
+  const res = await mem.listMemoryEdges({ limit: 5, minStrength: 0.2 });
+  assert.equal(res.length, 1);
+  assert.equal(res[0].kind, "related_to");
+});
+
+test("createCase generates id when missing", async () => {
+  const mem = new MemoryService(baseConfig);
+  let captured = null;
+
+  mem.upsertCase = async (payload) => {
+    captured = payload;
+    return payload.id;
+  };
+
+  const res = await mem.createCase({
+    title: "Case",
+    summary: "Summary",
+    outcome: "resolved",
+    symptoms: ["eacces"],
+    env: {},
+    resolvedByMemoryIds: [],
+    negativeMemoryIds: [],
+  });
+
+  assert.ok(res.startsWith("case_"));
+  assert.equal(captured.id, res);
 });
