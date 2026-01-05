@@ -7,6 +7,15 @@
 // - $sameKind: Only relate to same kind if true
 // - $samePolarity: Only relate to same polarity if true
 // - $allowedKinds: Optional list of kinds to consider (empty = all)
+// Neo4j Browser params (example only):
+// :param nowIso => "2026-01-04T22:07:53.086Z";
+// :param id => "mem_8cd773c2-208c-45ad-97ea-1b2337dca751";
+// :param minSharedTags => 2;
+// :param minWeight => 0.3;
+// :param maxCandidates => 10;
+// :param sameKind => false;
+// :param samePolarity => false;
+// :param allowedKinds => [];
 WITH datetime($nowIso) AS now
 MATCH (src:Memory {id: $id})
 WITH src, now, coalesce(src.tags, []) AS srcTags

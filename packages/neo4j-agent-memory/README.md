@@ -90,6 +90,21 @@ Auto-relate behavior:
 Performance note:
 - Auto-relate scans candidate memories with tag filtering; for large graphs, keep tags selective and consider tightening `maxCandidates` and `minSharedTags`.
 
+Neo4j Browser params (auto-relate by tags):
+
+```cypher
+:param nowIso => "2026-01-04T22:07:53.086Z";
+:param id => "mem_8cd773c2-208c-45ad-97ea-1b2337dca751";
+:param minSharedTags => 2;
+:param minWeight => 0.3;
+:param maxCandidates => 10;
+:param sameKind => false;
+:param samePolarity => false;
+:param allowedKinds => [];
+```
+
+Note: `:param` lines are only supported in Neo4j Browser; other runners should pass parameters via the driver.
+
 ## Tool adapter (createMemoryTools)
 
 Use the tool factory to preserve the existing tool surface used by the demo:
