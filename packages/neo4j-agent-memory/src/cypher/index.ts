@@ -23,4 +23,6 @@ export const cypher = {
   autoRelateByTags: loadCypher("auto_relate_memory_by_tags.cypher"),
   getMemoriesById: loadCypher("get_memories_by_id.cypher"),
   getMemoryGraph: loadCypher("get_memory_graph.cypher"),
+  fallbackRetrieveMemories: loadCypher("fallback_retrieve_memories.cypher"),
+  listMemoryEdges: loadCypher("list_memory_edges.cypher"),
 };

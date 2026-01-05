@@ -26,6 +26,8 @@ test("cypher assets are bundled in dist", () => {
     "auto_relate_memory_by_tags.cypher",
     "get_memories_by_id.cypher",
     "get_memory_graph.cypher",
+    "fallback_retrieve_memories.cypher",
+    "list_memory_edges.cypher",
   ];
 
   for (const name of files) {

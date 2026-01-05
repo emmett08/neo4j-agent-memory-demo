@@ -52,7 +52,13 @@ const bundle = await mem.retrieveContextBundle({
   prompt: "EACCES cannot create node_modules",
   symptoms: ["eacces", "permission denied", "node_modules"],
   tags: ["npm", "node_modules"],
-  env: { os: "macos", packageManager: "npm", container: false }
+  env: { os: "macos", packageManager: "npm", container: false },
+  fallback: {
+    enabled: true,
+    useFulltext: true,
+    useTags: true,
+    useVector: false,
+  },
 });
 
 const feedback = await mem.feedback({
@@ -69,7 +75,9 @@ await mem.close();
 Notes:
 - `createMemoryService` runs schema setup on init.
 - Cypher assets are bundled at `dist/cypher` in the published package.
- - `feedback()` returns updated RECALLS edge posteriors for the provided memory ids.
+- `feedback()` returns updated RECALLS edge posteriors for the provided memory ids.
+- Neutral usage: pass `neutralIds` or `updateUnratedUsed: false` to avoid penalizing retrieved-but-unrated memories.
+- Fallback retrieval uses fulltext/tag (and optional vector) search; provide `fallback.embedding` when using vector indexes.
 
 Auto-relate config (defaults):
 - `enabled: true`
@@ -158,6 +166,24 @@ const graph = await mem.getMemoryGraph({
   agentId: "auggie",
   memoryIds: ["mem-1", "mem-2"],
   includeNodes: true,
+  includeRelatedTo: true,
+});
+```
+
+List edges for analytics/audit:
+
+```ts
+const edges = await mem.listMemoryEdges({ limit: 500, minStrength: 0.2 });
+```
+
+Retrieve a bundle with graph edges in one call:
+
+```ts
+const bundleWithGraph = await mem.retrieveContextBundleWithGraph({
+  agentId: "auggie",
+  prompt: "EACCES cannot create node_modules",
+  tags: ["npm", "node_modules"],
+  includeRelatedTo: true,
 });
 ```
 
@@ -182,6 +208,38 @@ await mem.captureStepEpisode({
   prompt: "Apply the fix",
   response: "Ran chown and reinstalled.",
   outcome: "success",
+});
+```
+
+## Useful learning capture
+
+```ts
+await mem.captureUsefulLearning({
+  agentId: "auggie",
+  sessionId: "run-123",
+  useful: true,
+  learning: {
+    kind: "semantic",
+    title: "Avoid chmod 777 on node_modules",
+    content: "Use npm cache ownership fixes instead of chmod 777.",
+    tags: ["npm", "permissions"],
+    confidence: 0.8,
+    utility: 0.3,
+  },
+});
+```
+
+## Case helpers
+
+```ts
+await mem.createCase({
+  title: "npm EACCES",
+  summary: "Permission denied on cache directory.",
+  outcome: "resolved",
+  symptoms: ["eacces", "permission denied"],
+  env: { os: "macos", packageManager: "npm" },
+  resolvedByMemoryIds: ["mem-1"],
+  negativeMemoryIds: [],
 });
 ```
 

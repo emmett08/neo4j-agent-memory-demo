@@ -80,7 +80,7 @@ export interface MemorySummary {
 export interface MemoryGraphEdge {
   source: string;
   target: string;
-  kind: "recalls" | "co_used_with";
+  kind: "recalls" | "co_used_with" | "related_to";
   strength: number;
   evidence: number;
   updatedAt?: string | null;
@@ -115,6 +115,14 @@ export interface RetrieveContextArgs {
   fixLimit?: number;
   dontLimit?: number;
   nowIso?: string;
+  fallback?: {
+    enabled?: boolean;
+    limit?: number;
+    useFulltext?: boolean;
+    useVector?: boolean;
+    useTags?: boolean;
+    embedding?: number[];
+  };
 }
 
 export interface ListMemoriesArgs {
@@ -131,6 +139,7 @@ export interface GetMemoryGraphArgs {
   agentId?: string;
   memoryIds: string[];
   includeNodes?: boolean;
+  includeRelatedTo?: boolean;
 }
 
 export interface BetaEdge {
@@ -181,6 +190,8 @@ export interface MemoryFeedback {
   usedIds: string[];
   usefulIds: string[];
   notUsefulIds: string[];
+  neutralIds?: string[];
+  updateUnratedUsed?: boolean;
   preventedErrorIds?: string[]; // negative memories that prevented mistakes
   metrics?: FeedbackMetrics;
   notes?: string;
@@ -188,6 +199,37 @@ export interface MemoryFeedback {
 
 export interface MemoryFeedbackResult {
   updated: Array<{ id: string; edge: BetaEdge }>;
+}
+
+export interface ListMemoryEdgesArgs {
+  limit?: number;
+  minStrength?: number;
+}
+
+export interface MemoryEdgeExport {
+  source: string;
+  target: string;
+  kind: "co_used_with" | "related_to";
+  strength: number;
+  evidence: number;
+  updatedAt?: string | null;
+}
+
+export interface RetrieveContextBundleWithGraphArgs extends RetrieveContextArgs {
+  includeNodes?: boolean;
+  includeRelatedTo?: boolean;
+}
+
+export interface ContextBundleWithGraph {
+  bundle: ContextBundle;
+  graph: MemoryGraphResponse;
+}
+
+export interface CaptureUsefulLearningArgs {
+  agentId: string;
+  sessionId?: string;
+  useful?: boolean;
+  learning: LearningCandidate & { utility?: number };
 }
 
 export interface CaptureEpisodeArgs {
@@ -218,6 +260,7 @@ export interface LearningCandidate {
   content: string;
   tags: string[];
   confidence: number; // 0..1
+  utility?: number; // 0..1 optional override
   signals?: MemoryRecord["signals"];
   env?: EnvironmentFingerprint;
   triage?: MemoryTriage;

@@ -22,6 +22,11 @@ import type {
   GetMemoryGraphArgs,
   MemoryGraphResponse,
   MemoryRecord,
+  ListMemoryEdgesArgs,
+  MemoryEdgeExport,
+  RetrieveContextBundleWithGraphArgs,
+  ContextBundleWithGraph,
+  CaptureUsefulLearningArgs,
 } from "./types.js";
 import { canonicaliseForHash, envHash, newId, normaliseSymptom, sha256Hex } from "./utils/hash.js";
 import { cypher } from "./cypher/index.js";
@@ -173,6 +178,8 @@ export class MemoryService {
   private cyAutoRelateByTags = cypher.autoRelateByTags;
   private cyGetMemoriesById = cypher.getMemoriesById;
   private cyGetMemoryGraph = cypher.getMemoryGraph;
+  private cyFallbackRetrieve = cypher.fallbackRetrieveMemories;
+  private cyListMemoryEdges = cypher.listMemoryEdges;
   private cyGetRecallEdges = `
     UNWIND $ids AS id
     MATCH (m:Memory {id:id})
@@ -271,7 +278,7 @@ export class MemoryService {
         contentHash,
         tags,
         confidence: clamp01(l.confidence),
-        utility: 0.2, // start modest; reinforce via feedback
+        utility: typeof l.utility === "number" ? clamp01(l.utility) : 0.2, // start modest; reinforce via feedback
         triage: l.triage ? JSON.stringify(l.triage) : null,
         antiPattern: l.antiPattern ? JSON.stringify(l.antiPattern) : null,
       });
@@ -355,6 +362,14 @@ export class MemoryService {
   }
 
   /**
+   * Create a new Case with an auto-generated id if none is provided.
+   */
+  async createCase(c: Omit<CaseRecord, "id"> & { id?: string }): Promise<string> {
+    const id = c.id ?? newId("case");
+    return this.upsertCase({ ...c, id });
+  }
+
+  /**
    * Retrieve a ContextBundle with separate Fix and Do-not-do sections, using case-based reasoning.
    * The key idea: match cases by symptoms + env similarity, then pull linked memories.
    */
@@ -381,28 +396,50 @@ export class MemoryService {
       });
 
       const sections = r.records[0].get("sections") as { fixes: any[]; doNot: any[] };
-      const fixes = (sections.fixes ?? []).map((m: any) => ({
+      const mapSummary = (m: any, fallbackPolarity: MemoryPolarity) => ({
         id: m.id,
         kind: m.kind,
-        polarity: m.polarity ?? "positive",
+        polarity: m.polarity ?? fallbackPolarity,
         title: m.title,
         content: m.content,
         tags: m.tags ?? [],
         confidence: m.confidence ?? 0.7,
         utility: m.utility ?? 0.2,
         updatedAt: m.updatedAt?.toString?.() ?? null,
-      }));
-      const doNot = (sections.doNot ?? []).map((m: any) => ({
-        id: m.id,
-        kind: m.kind,
-        polarity: m.polarity ?? "negative",
-        title: m.title,
-        content: m.content,
-        tags: m.tags ?? [],
-        confidence: m.confidence ?? 0.7,
-        utility: m.utility ?? 0.2,
-        updatedAt: m.updatedAt?.toString?.() ?? null,
-      }));
+      });
+      let fixes = (sections.fixes ?? []).map((m: any) => mapSummary(m, "positive"));
+      let doNot = (sections.doNot ?? []).map((m: any) => mapSummary(m, "negative"));
+
+      const fallback = args.fallback ?? {};
+      const shouldFallback = fallback.enabled === true && fixes.length === 0 && doNot.length === 0;
+      if (shouldFallback) {
+        const fallbackFixLimit = fallback.limit ?? fixLimit;
+        const fallbackDontLimit = fallback.limit ?? dontLimit;
+        try {
+          const fallbackRes = await session.run(this.cyFallbackRetrieve, {
+            prompt: args.prompt ?? "",
+            tags: args.tags ?? [],
+            kinds: args.kinds ?? [],
+            fulltextIndex: this.fulltextIndex,
+            vectorIndex: this.vectorIndex,
+            embedding: fallback.embedding ?? null,
+            useFulltext: fallback.useFulltext ?? true,
+            useVector: fallback.useVector ?? false,
+            useTags: fallback.useTags ?? true,
+            fixLimit: fallbackFixLimit,
+            dontLimit: fallbackDontLimit,
+          });
+          const fbSections = fallbackRes.records[0]?.get("sections") as { fixes: any[]; doNot: any[] };
+          fixes = (fbSections?.fixes ?? []).map((m: any) => mapSummary(m, "positive"));
+          doNot = (fbSections?.doNot ?? []).map((m: any) => mapSummary(m, "negative"));
+        } catch (err) {
+          this.emit({
+            type: "read",
+            action: "retrieveContextBundle.fallbackError",
+            meta: { message: err instanceof Error ? err.message : String(err) },
+          });
+        }
+      }
 
       // Fetch current RECALLS edge posteriors for all retrieved memories (edgeAfter).
       const allIds = [...new Set([...fixes.map((x) => x.id), ...doNot.map((x) => x.id)])];
@@ -511,6 +548,7 @@ export class MemoryService {
         agentId: args.agentId ?? null,
         memoryIds: ids,
         includeNodes: args.includeNodes ?? true,
+        includeRelatedTo: args.includeRelatedTo ?? false,
       });
       const record = res.records[0];
       const nodesRaw = (record?.get("nodes") as any[]) ?? [];
@@ -522,6 +560,34 @@ export class MemoryService {
     } finally {
       await session.close();
     }
+  }
+
+  async listMemoryEdges(args: ListMemoryEdgesArgs = {}): Promise<MemoryEdgeExport[]> {
+    const session = this.client.session("READ");
+    try {
+      const res = await session.run(this.cyListMemoryEdges, {
+        limit: args.limit ?? 200,
+        minStrength: args.minStrength ?? 0.0,
+      });
+      return (res.records[0]?.get("edges") as any[]) ?? [];
+    } finally {
+      await session.close();
+    }
+  }
+
+  async retrieveContextBundleWithGraph(args: RetrieveContextBundleWithGraphArgs): Promise<ContextBundleWithGraph> {
+    const bundle = await this.retrieveContextBundle(args);
+    const ids = [
+      ...bundle.sections.fix.map((m) => m.id),
+      ...bundle.sections.doNotDo.map((m) => m.id),
+    ];
+    const graph = await this.getMemoryGraph({
+      agentId: args.agentId,
+      memoryIds: ids,
+      includeNodes: args.includeNodes ?? false,
+      includeRelatedTo: args.includeRelatedTo ?? false,
+    });
+    return { bundle, graph };
   }
 
   async listEpisodes(args: Omit<ListMemoriesArgs, "kind"> = {}): Promise<MemorySummary[]> {
@@ -559,6 +625,23 @@ export class MemoryService {
     return result;
   }
 
+  async captureUsefulLearning(args: CaptureUsefulLearningArgs): Promise<SaveLearningResult> {
+    if (args.useful === false) {
+      return { saved: [], rejected: [{ title: args.learning.title, reason: "not marked useful" }] };
+    }
+    const result = await this.saveLearnings({
+      agentId: args.agentId,
+      sessionId: args.sessionId,
+      learnings: [args.learning],
+    });
+    this.emit({
+      type: "write",
+      action: "captureUsefulLearning",
+      meta: { title: args.learning.title, savedCount: result.saved.length },
+    });
+    return result;
+  }
+
   async captureStepEpisode(args: CaptureStepEpisodeArgs): Promise<SaveLearningResult> {
     const title = `Episode ${args.workflowName} - ${args.stepName}`;
     const base: CaptureEpisodeArgs = {
@@ -590,15 +673,19 @@ export class MemoryService {
     const used = new Set(fb.usedIds ?? []);
     const useful = new Set(fb.usefulIds ?? []);
     const notUseful = new Set(fb.notUsefulIds ?? []);
+    const neutral = new Set(fb.neutralIds ?? []);
     const prevented = new Set(fb.preventedErrorIds ?? []);
+    const updateUnratedUsed = fb.updateUnratedUsed ?? true;
 
     // normalise sets: if marked useful or prevented, treat as useful
     for (const id of prevented) useful.add(id);
     for (const id of useful) notUseful.delete(id);
+    for (const id of neutral) notUseful.delete(id);
 
     // Ensure used includes all mentioned ids
     for (const id of useful) used.add(id);
     for (const id of notUseful) used.add(id);
+    for (const id of neutral) used.add(id);
 
     const quality = clamp01(fb.metrics?.quality ?? 0.7);
     const hallucRisk = clamp01(fb.metrics?.hallucinationRisk ?? 0.2);
@@ -612,7 +699,19 @@ export class MemoryService {
     // Per-memory y: useful/prevented => baseY, notUseful => 0
     const yById = new Map<string, number>();
     for (const id of used) {
-      yById.set(id, useful.has(id) ? baseY : 0.0);
+      if (useful.has(id)) {
+        yById.set(id, baseY);
+        continue;
+      }
+      if (notUseful.has(id)) {
+        yById.set(id, 0.0);
+        continue;
+      }
+      if (neutral.has(id) || !updateUnratedUsed) {
+        yById.set(id, 0.5);
+        continue;
+      }
+      yById.set(id, 0.0);
     }
 
     const items = [...used].map((memoryId) => ({
