@@ -20,4 +20,7 @@ export const cypher = {
   feedbackCoUsed: loadCypher("feedback_co_used_with_batch.cypher"),
   listMemories: loadCypher("list_memories.cypher"),
   relateConcepts: loadCypher("relate_concepts.cypher"),
+  autoRelateByTags: loadCypher("auto_relate_memory_by_tags.cypher"),
+  getMemoriesById: loadCypher("get_memories_by_id.cypher"),
+  getMemoryGraph: loadCypher("get_memory_graph.cypher"),
 };

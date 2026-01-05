@@ -16,5 +16,8 @@ FOR (m:Memory) ON (m.polarity);
 CREATE INDEX memory_kind IF NOT EXISTS
 FOR (m:Memory) ON (m.kind);
 
+CREATE INDEX memory_tags IF NOT EXISTS
+FOR (m:Memory) ON (m.tags);
+
 CREATE CONSTRAINT agent_id_unique IF NOT EXISTS
 FOR (a:Agent) REQUIRE a.id IS UNIQUE;

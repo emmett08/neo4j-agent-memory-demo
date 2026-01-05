@@ -23,6 +23,9 @@ test("cypher assets are bundled in dist", () => {
     "feedback_co_used_with_batch.cypher",
     "list_memories.cypher",
     "relate_concepts.cypher",
+    "auto_relate_memory_by_tags.cypher",
+    "get_memories_by_id.cypher",
+    "get_memory_graph.cypher",
   ];
 
   for (const name of files) {

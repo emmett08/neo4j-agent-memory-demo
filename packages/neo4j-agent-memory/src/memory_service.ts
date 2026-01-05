@@ -8,6 +8,7 @@ import type {
   RetrieveContextArgs,
   ContextBundle,
   MemoryFeedback,
+  MemoryFeedbackResult,
   CaptureEpisodeArgs,
   CaptureStepEpisodeArgs,
   SaveLearningRequest,
@@ -16,6 +17,11 @@ import type {
   EnvironmentFingerprint,
   MemoryPolarity,
   CaseRecord,
+  AutoRelateConfig,
+  GetMemoriesByIdArgs,
+  GetMemoryGraphArgs,
+  MemoryGraphResponse,
+  MemoryRecord,
 } from "./types.js";
 import { canonicaliseForHash, envHash, newId, normaliseSymptom, sha256Hex } from "./utils/hash.js";
 import { cypher } from "./cypher/index.js";
@@ -23,6 +29,35 @@ import { cypher } from "./cypher/index.js";
 function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
 }
+
+function parseJsonField<T>(value: unknown): T | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string") return value as T;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+function toDateString(value: any): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value?.toString === "function") return value.toString();
+  return String(value);
+}
+
+const DEFAULT_AUTO_RELATE: Required<AutoRelateConfig> = {
+  enabled: true,
+  minSharedTags: 2,
+  minWeight: 0.2,
+  maxCandidates: 12,
+  sameKind: true,
+  samePolarity: true,
+  allowedKinds: ["semantic", "procedural"],
+};
+
+const AUTO_RELATE_MIN_SHARED_TAGS = 1;
+const AUTO_RELATE_MIN_MAX_CANDIDATES = 1;
 
 function toBetaEdge(raw: any): { a: number; b: number; strength: number; evidence: number; updatedAt: string | null } {
   const aMin = 1e-3;
@@ -37,6 +72,24 @@ function toBetaEdge(raw: any): { a: number; b: number; strength: number; evidenc
     strength: typeof raw?.strength === "number" ? raw.strength : (a / (a + b)),
     evidence: ev,
     updatedAt: raw?.updatedAt ?? null,
+  };
+}
+
+function toMemoryRecord(raw: any): MemoryRecord {
+  return {
+    id: raw.id,
+    kind: raw.kind,
+    polarity: raw.polarity ?? "positive",
+    title: raw.title,
+    content: raw.content,
+    tags: raw.tags ?? [],
+    confidence: raw.confidence ?? 0.7,
+    utility: raw.utility ?? 0.2,
+    createdAt: toDateString(raw.createdAt),
+    updatedAt: toDateString(raw.updatedAt),
+    triage: parseJsonField(raw.triage),
+    antiPattern: parseJsonField(raw.antiPattern),
+    env: raw.env ?? undefined,
   };
 }
 
@@ -108,6 +161,7 @@ export class MemoryService {
   private fulltextIndex: string;
   private halfLifeSeconds: number;
   private onMemoryEvent?: MemoryServiceConfig["onMemoryEvent"];
+  private autoRelateConfig: Required<AutoRelateConfig>;
 
   private cyUpsertMemory = cypher.upsertMemory;
   private cyUpsertCase = cypher.upsertCase;
@@ -116,6 +170,9 @@ export class MemoryService {
   private cyFeedbackCoUsed = cypher.feedbackCoUsed;
   private cyListMemories = cypher.listMemories;
   private cyRelateConcepts = cypher.relateConcepts;
+  private cyAutoRelateByTags = cypher.autoRelateByTags;
+  private cyGetMemoriesById = cypher.getMemoriesById;
+  private cyGetMemoryGraph = cypher.getMemoryGraph;
   private cyGetRecallEdges = `
     UNWIND $ids AS id
     MATCH (m:Memory {id:id})
@@ -134,6 +191,22 @@ export class MemoryService {
     this.fulltextIndex = cfg.fulltextIndex ?? "memoryText";
     this.halfLifeSeconds = cfg.halfLifeSeconds ?? 30 * 24 * 3600;
     this.onMemoryEvent = cfg.onMemoryEvent;
+    const autoRelate = cfg.autoRelate ?? {};
+    this.autoRelateConfig = {
+      enabled: autoRelate.enabled ?? DEFAULT_AUTO_RELATE.enabled,
+      minSharedTags: Math.max(
+        AUTO_RELATE_MIN_SHARED_TAGS,
+        Math.floor(autoRelate.minSharedTags ?? DEFAULT_AUTO_RELATE.minSharedTags)
+      ),
+      minWeight: clamp01(autoRelate.minWeight ?? DEFAULT_AUTO_RELATE.minWeight),
+      maxCandidates: Math.max(
+        AUTO_RELATE_MIN_MAX_CANDIDATES,
+        Math.floor(autoRelate.maxCandidates ?? DEFAULT_AUTO_RELATE.maxCandidates)
+      ),
+      sameKind: autoRelate.sameKind ?? DEFAULT_AUTO_RELATE.sameKind,
+      samePolarity: autoRelate.samePolarity ?? DEFAULT_AUTO_RELATE.samePolarity,
+      allowedKinds: autoRelate.allowedKinds ?? [...DEFAULT_AUTO_RELATE.allowedKinds],
+    };
   }
 
   async init(): Promise<void> {
@@ -227,6 +300,24 @@ export class MemoryService {
             pmVersion: env.pmVersion ?? null,
           }
         );
+      }
+      const autoRelate = this.autoRelateConfig;
+      const allowedKinds = autoRelate.allowedKinds ?? [];
+      const canAutoRelate =
+        autoRelate.enabled &&
+        tags.length >= autoRelate.minSharedTags &&
+        (allowedKinds.length === 0 || allowedKinds.includes(l.kind));
+      if (canAutoRelate) {
+        await write.run(this.cyAutoRelateByTags, {
+          id,
+          nowIso: new Date().toISOString(),
+          minSharedTags: autoRelate.minSharedTags,
+          minWeight: autoRelate.minWeight,
+          maxCandidates: autoRelate.maxCandidates,
+          sameKind: autoRelate.sameKind,
+          samePolarity: autoRelate.samePolarity,
+          allowedKinds,
+        });
       }
       this.emit({ type: "write", action: "upsertMemory", meta: { id } });
       return { id, deduped: false };
@@ -398,6 +489,41 @@ export class MemoryService {
     }
   }
 
+  async getMemoriesById(args: GetMemoriesByIdArgs): Promise<MemoryRecord[]> {
+    const ids = [...new Set((args.ids ?? []).filter(Boolean))];
+    if (ids.length === 0) return [];
+    const session = this.client.session("READ");
+    try {
+      const res = await session.run(this.cyGetMemoriesById, { ids });
+      const memories = (res.records[0]?.get("memories") as any[]) ?? [];
+      return memories.map(toMemoryRecord);
+    } finally {
+      await session.close();
+    }
+  }
+
+  async getMemoryGraph(args: GetMemoryGraphArgs): Promise<MemoryGraphResponse> {
+    const ids = [...new Set((args.memoryIds ?? []).filter(Boolean))];
+    if (ids.length === 0) return { nodes: [], edges: [] };
+    const session = this.client.session("READ");
+    try {
+      const res = await session.run(this.cyGetMemoryGraph, {
+        agentId: args.agentId ?? null,
+        memoryIds: ids,
+        includeNodes: args.includeNodes ?? true,
+      });
+      const record = res.records[0];
+      const nodesRaw = (record?.get("nodes") as any[]) ?? [];
+      const edges = (record?.get("edges") as any[]) ?? [];
+      return {
+        nodes: nodesRaw.map(toMemoryRecord),
+        edges,
+      };
+    } finally {
+      await session.close();
+    }
+  }
+
   async listEpisodes(args: Omit<ListMemoriesArgs, "kind"> = {}): Promise<MemorySummary[]> {
     return this.listMemories({ ...args, kind: "episodic" });
   }
@@ -458,7 +584,7 @@ export class MemoryService {
    * Reinforce/degrade agent->memory association weights using a single batched Cypher query.
    * This supports mid-run retrieval by making feedback cheap and frequent.
    */
-  async feedback(fb: MemoryFeedback): Promise<void> {
+  async feedback(fb: MemoryFeedback): Promise<MemoryFeedbackResult> {
     const nowIso = new Date().toISOString();
 
     const used = new Set(fb.usedIds ?? []);
@@ -494,19 +620,29 @@ export class MemoryService {
       y: yById.get(memoryId) ?? 0.0,
       w,
     }));
-    if (items.length === 0) return;
+    if (items.length === 0) return { updated: [] };
 
     const session = this.client.session("WRITE");
     try {
       // ensure agent node exists
       await session.run("MERGE (a:Agent {id:$id}) RETURN a", { id: fb.agentId });
-      await session.run(this.cyFeedbackBatch, {
+      const feedbackRes = await session.run(this.cyFeedbackBatch, {
         agentId: fb.agentId,
         nowIso,
         items,
         halfLifeSeconds: this.halfLifeSeconds,
         aMin: 1e-3,
         bMin: 1e-3,
+      });
+      const updated = feedbackRes.records.map((rec) => {
+        const raw = {
+          a: rec.get("a"),
+          b: rec.get("b"),
+          strength: rec.get("strength"),
+          evidence: rec.get("evidence"),
+          updatedAt: rec.get("updatedAt"),
+        };
+        return { id: rec.get("id"), edge: toBetaEdge(raw) };
       });
 
       // Update CO_USED_WITH edges using canonicalised unordered pairs.
@@ -533,6 +669,7 @@ export class MemoryService {
         });
       }
       this.emit({ type: "write", action: "feedback", meta: { agentId: fb.agentId, usedCount: used.size } });
+      return { updated };
     } finally {
       await session.close();
     }
