@@ -22,6 +22,14 @@ export interface DistilledInvariant {
   risks?: string[];
 }
 
+export interface MemoryTriage {
+  symptoms: string[];
+  likelyCauses: string[];
+  verificationSteps?: string[];
+  fixSteps?: string[];
+  gotchas?: string[];
+}
+
 export interface MemoryRecord {
   id: string;
   kind: MemoryKind;
@@ -33,6 +41,8 @@ export interface MemoryRecord {
   utility: number;              // 0..1
   createdAt?: string;
   updatedAt?: string;
+
+  triage?: MemoryTriage;
 
   signals?: {
     symptoms?: string[];
@@ -67,6 +77,20 @@ export interface MemorySummary {
   updatedAt?: string | null;
 }
 
+export interface MemoryGraphEdge {
+  source: string;
+  target: string;
+  kind: "recalls" | "co_used_with";
+  strength: number;
+  evidence: number;
+  updatedAt?: string | null;
+}
+
+export interface MemoryGraphResponse {
+  nodes: MemoryRecord[];
+  edges: MemoryGraphEdge[];
+}
+
 export interface CaseRecord {
   id: string;
   title: string;
@@ -97,6 +121,16 @@ export interface ListMemoriesArgs {
   kind?: MemoryKind;
   limit?: number;
   agentId?: string;
+}
+
+export interface GetMemoriesByIdArgs {
+  ids: string[];
+}
+
+export interface GetMemoryGraphArgs {
+  agentId?: string;
+  memoryIds: string[];
+  includeNodes?: boolean;
 }
 
 export interface BetaEdge {
@@ -152,6 +186,10 @@ export interface MemoryFeedback {
   notes?: string;
 }
 
+export interface MemoryFeedbackResult {
+  updated: Array<{ id: string; edge: BetaEdge }>;
+}
+
 export interface CaptureEpisodeArgs {
   agentId: string;
   runId: string;
@@ -182,13 +220,7 @@ export interface LearningCandidate {
   confidence: number; // 0..1
   signals?: MemoryRecord["signals"];
   env?: EnvironmentFingerprint;
-  triage?: {
-    symptoms: string[];
-    likelyCauses: string[];
-    verificationSteps?: string[];
-    fixSteps?: string[];
-    gotchas?: string[];
-  };
+  triage?: MemoryTriage;
   antiPattern?: MemoryRecord["antiPattern"];
 }
 
@@ -209,11 +241,22 @@ export interface SaveLearningResult {
   rejected: Array<{ title: string; reason: string }>;
 }
 
+export interface AutoRelateConfig {
+  enabled?: boolean;
+  minSharedTags?: number;
+  minWeight?: number;
+  maxCandidates?: number;
+  sameKind?: boolean;
+  samePolarity?: boolean;
+  allowedKinds?: MemoryKind[];
+}
+
 export interface MemoryServiceConfig {
   neo4j: { uri: string; username: string; password: string; database?: string };
   vectorIndex?: string;   // default memoryEmbedding
   fulltextIndex?: string; // default memoryText
   halfLifeSeconds?: number; // default 30 days
+  autoRelate?: AutoRelateConfig;
   onMemoryEvent?: (event: MemoryEvent) => void;
 }
 

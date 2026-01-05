@@ -35,7 +35,16 @@ const mem = await createMemoryService({
   neo4j: { uri, username, password },
   vectorIndex: "memoryEmbedding",
   fulltextIndex: "memoryText",
-  halfLifeSeconds: 30 * 24 * 3600
+  halfLifeSeconds: 30 * 24 * 3600,
+  autoRelate: {
+    enabled: true,
+    minSharedTags: 2,
+    minWeight: 0.2,
+    maxCandidates: 12,
+    sameKind: true,
+    samePolarity: true,
+    allowedKinds: ["semantic", "procedural"]
+  }
 });
 
 const bundle = await mem.retrieveContextBundle({
@@ -46,7 +55,7 @@ const bundle = await mem.retrieveContextBundle({
   env: { os: "macos", packageManager: "npm", container: false }
 });
 
-await mem.feedback({
+const feedback = await mem.feedback({
   agentId: "auggie",
   sessionId: bundle.sessionId,
   usedIds: bundle.sections.fix.map((m) => m.id),
@@ -60,6 +69,41 @@ await mem.close();
 Notes:
 - `createMemoryService` runs schema setup on init.
 - Cypher assets are bundled at `dist/cypher` in the published package.
+ - `feedback()` returns updated RECALLS edge posteriors for the provided memory ids.
+
+Auto-relate config (defaults):
+- `enabled: true`
+- `minSharedTags: 2`
+- `minWeight: 0.2`
+- `maxCandidates: 12`
+- `sameKind: true`
+- `samePolarity: true`
+- `allowedKinds: ["semantic", "procedural"]`
+
+Auto-relate behavior:
+- Uses tag overlap with Jaccard weight (`shared / (a + b - shared)`).
+- Runs only for newly inserted memories (skips deduped).
+- Applies filters for `sameKind`, `samePolarity`, and `allowedKinds`.
+- Requires `minSharedTags` and `minWeight` to pass before linking.
+- Limits to `maxCandidates` highest-weight neighbors.
+
+Performance note:
+- Auto-relate scans candidate memories with tag filtering; for large graphs, keep tags selective and consider tightening `maxCandidates` and `minSharedTags`.
+
+Neo4j Browser params (auto-relate by tags):
+
+```cypher
+:param nowIso => "2026-01-04T22:07:53.086Z";
+:param id => "mem_8cd773c2-208c-45ad-97ea-1b2337dca751";
+:param minSharedTags => 2;
+:param minWeight => 0.3;
+:param maxCandidates => 10;
+:param sameKind => false;
+:param samePolarity => false;
+:param allowedKinds => [];
+```
+
+Note: `:param` lines are only supported in Neo4j Browser; other runners should pass parameters via the driver.
 
 ## Tool adapter (createMemoryTools)
 
@@ -97,6 +141,24 @@ const all = await mem.listMemories({ limit: 50 });
 const episodes = await mem.listEpisodes({ agentId: "auggie" });
 const skills = await mem.listSkills({ agentId: "auggie" });
 const concepts = await mem.listConcepts({ agentId: "auggie" });
+```
+
+## Graph APIs
+
+Fetch full memory records by id:
+
+```ts
+const records = await mem.getMemoriesById({ ids: ["mem-1", "mem-2"] });
+```
+
+Retrieve a weighted subgraph for UI maps:
+
+```ts
+const graph = await mem.getMemoryGraph({
+  agentId: "auggie",
+  memoryIds: ["mem-1", "mem-2"],
+  includeNodes: true,
+});
 ```
 
 ## Episodic capture helpers

@@ -53,3 +53,41 @@ run("list_memories.cypher EXPLAINs", async () => {
   });
 });
 
+run("auto_relate_memory_by_tags.cypher EXPLAINs", async () => {
+  const query = readFileSync(path.join(cypherDir, "auto_relate_memory_by_tags.cypher"), "utf8");
+  await withSession(async (session) => {
+    const result = await session.run(`EXPLAIN ${query}`, {
+      id: "mem_auto_relate_test",
+      nowIso: new Date().toISOString(),
+      minSharedTags: 2,
+      minWeight: 0.2,
+      maxCandidates: 5,
+      sameKind: true,
+      samePolarity: true,
+      allowedKinds: ["semantic"],
+    });
+    await result.consume();
+  });
+});
+
+run("get_memories_by_id.cypher EXPLAINs", async () => {
+  const query = readFileSync(path.join(cypherDir, "get_memories_by_id.cypher"), "utf8");
+  await withSession(async (session) => {
+    const result = await session.run(`EXPLAIN ${query}`, {
+      ids: ["mem_1", "mem_2"],
+    });
+    await result.consume();
+  });
+});
+
+run("get_memory_graph.cypher EXPLAINs", async () => {
+  const query = readFileSync(path.join(cypherDir, "get_memory_graph.cypher"), "utf8");
+  await withSession(async (session) => {
+    const result = await session.run(`EXPLAIN ${query}`, {
+      agentId: "agent-1",
+      memoryIds: ["mem_1", "mem_2"],
+      includeNodes: true,
+    });
+    await result.consume();
+  });
+});
