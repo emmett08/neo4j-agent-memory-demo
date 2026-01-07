@@ -108,7 +108,7 @@ npm run build
 npm run db:seed
 ```
 
-This will populate Neo4j with sample UX/UI memories and cases for testing.
+This populates Neo4j with sample memories/cases/relationships from `apps/demo-api/seed/*.csv` and exercises all Cypher scripts.
 
 #### 6) Run demo API
 ```bash

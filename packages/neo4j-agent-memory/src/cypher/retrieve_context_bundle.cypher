@@ -1,14 +1,16 @@
 // Parameters expected at runtime (driver):
 // $nowIso, $symptoms, $tags, $env, $agentId, $caseLimit, $fixLimit, $dontLimit, $halfLifeSeconds
+// Parameters (Neo4j Browser / Neo4j VSCode :param) - example only:
+// :param { nowIso: "2026-01-07T00:00:00Z", symptoms: ["eacces", "permission denied"], tags: ["npm", "permissions"], env: { os: "macos", packageManager: "npm", container: false }, agentId: "agent-1", caseLimit: 5, fixLimit: 8, dontLimit: 6, halfLifeSeconds: 2592000 }
 WITH
   datetime(coalesce($nowIso, toString(datetime()))) AS now,
   coalesce($symptoms, []) AS qSymptoms,
   coalesce($tags, []) AS qTags,
   coalesce($env, {}) AS qEnv,
   coalesce($agentId, "") AS agentId,
-  coalesce($caseLimit, 10) AS caseLimit,
-  coalesce($fixLimit, 8) AS fixLimit,
-  coalesce($dontLimit, 5) AS dontLimit,
+  toInteger(coalesce($caseLimit, 10)) AS caseLimit,
+  toInteger(coalesce($fixLimit, 8)) AS fixLimit,
+  toInteger(coalesce($dontLimit, 5)) AS dontLimit,
   coalesce($halfLifeSeconds, 86400.0) AS halfLifeSeconds,
   0.001 AS aMin,
   0.001 AS bMin,
@@ -31,7 +33,8 @@ CALL (now, qSymptoms, qTags, qEnv, caseLimit) {
     END AS cases2
   UNWIND cases2 AS c
 
-  OPTIONAL MATCH (c)-[:HAS_SYMPTOM]->(sAll:Symptom)
+  OPTIONAL MATCH (c)-[hs]->(sAll:Symptom)
+  WHERE type(hs) = "HAS_SYMPTOM"
   WITH
     now,
     qSymptoms,
@@ -62,7 +65,8 @@ CALL (now, qSymptoms, qTags, qEnv, caseLimit) {
         toFloat(size(qSymptoms) + size(caseSymptoms) - size(matched))
     END AS symptomScore
 
-  OPTIONAL MATCH (c)-[:IN_ENV]->(e:EnvironmentFingerprint)
+  OPTIONAL MATCH (c)-[ie]->(e:EnvironmentFingerprint)
+  WHERE type(ie) = "IN_ENV"
   WITH
     c,
     symptomScore,
@@ -175,8 +179,8 @@ CALL (
       ELSE topScores[i]
     END AS cs
 
-  OPTIONAL MATCH (c)-[:RESOLVED_BY]->(m:Memory)
-  WHERE coalesce(m.polarity, "positive") = "positive"
+  OPTIONAL MATCH (c)-[rb]->(m:Memory)
+  WHERE type(rb) = "RESOLVED_BY" AND coalesce(m.polarity, "positive") = "positive"
   WITH
     now,
     qTags,
@@ -189,7 +193,8 @@ CALL (
     m,
     max(cs) AS caseContribution
 
-  OPTIONAL MATCH (a:Agent {id: agentId})-[r:RECALLS]->(m)
+  OPTIONAL MATCH (a:Agent {id: agentId})-[r]->(m)
+  WHERE type(r) = "RECALLS"
   WITH
     now,
     qTags,
@@ -317,6 +322,19 @@ CALL (
         .polarity,
         .title,
         .content,
+        .summary,
+        .whenToUse,
+        .howToApply,
+        .gotchas,
+        .scopeRepo,
+        .scopePackage,
+        .scopeModule,
+        .scopeRuntime,
+        .scopeVersions,
+        .evidence,
+        .outcome,
+        .validFrom,
+        .validTo,
         .utility,
         .confidence,
         .updatedAt,
@@ -389,8 +407,8 @@ CALL (
       ELSE topScores[j]
     END AS cs2
 
-  OPTIONAL MATCH (c2)-[:HAS_NEGATIVE]->(n:Memory)
-  WHERE coalesce(n.polarity, "negative") = "negative"
+  OPTIONAL MATCH (c2)-[hn]->(n:Memory)
+  WHERE type(hn) = "HAS_NEGATIVE" AND coalesce(n.polarity, "negative") = "negative"
   WITH
     now,
     qTags,
@@ -404,7 +422,8 @@ CALL (
     n,
     max(cs2) AS caseContribution2
 
-  OPTIONAL MATCH (a:Agent {id: agentId})-[r2:RECALLS]->(n)
+  OPTIONAL MATCH (a:Agent {id: agentId})-[r2]->(n)
+  WHERE type(r2) = "RECALLS"
   WITH
     now,
     qTags,
@@ -539,6 +558,19 @@ CALL (
         .polarity,
         .title,
         .content,
+        .summary,
+        .whenToUse,
+        .howToApply,
+        .gotchas,
+        .scopeRepo,
+        .scopePackage,
+        .scopeModule,
+        .scopeRuntime,
+        .scopeVersions,
+        .evidence,
+        .outcome,
+        .validFrom,
+        .validTo,
         .utility,
         .confidence,
         .updatedAt,

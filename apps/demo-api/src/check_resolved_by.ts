@@ -1,19 +1,9 @@
-import neo4j from "neo4j-driver";
 import { exitWithError } from "./utils/errors.js";
-
-function envOrThrow(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env var ${name}`);
-  return v;
-}
+import { createNeo4jClientFromEnv } from "./utils/neo4j.js";
 
 async function main() {
-  const driver = neo4j.driver(
-    envOrThrow("NEO4J_URI"),
-    neo4j.auth.basic(envOrThrow("NEO4J_USER"), envOrThrow("NEO4J_PASSWORD"))
-  );
-
-  const session = driver.session();
+  const client = createNeo4jClientFromEnv();
+  const session = client.session("READ");
   
   try {
     // Check RESOLVED_BY relationships
@@ -61,7 +51,7 @@ async function main() {
 
   } finally {
     await session.close();
-    await driver.close();
+    await client.close();
   }
 }
 

@@ -1,3 +1,6 @@
+// Parameters (Neo4j Browser / Neo4j VSCode :param) - example only:
+// :param { prompt: "permission denied", tags: ["npm", "permissions"], kinds: ["semantic", "procedural"], fulltextIndex: "memoryText", vectorIndex: "memoryEmbedding", embedding: null, useFulltext: true, useVector: false, useTags: true, fixLimit: 8, dontLimit: 6 }
+//
 // Parameters:
 // - $prompt: Query text
 // - $tags: Array of tags
@@ -20,10 +23,10 @@ WITH
   coalesce($useFulltext, true) AS useFulltext,
   coalesce($useVector, false) AS useVector,
   coalesce($useTags, true) AS useTags,
-  coalesce($fixLimit, 8) AS fixLimit,
-  coalesce($dontLimit, 6) AS dontLimit
+  toInteger(coalesce($fixLimit, 8)) AS fixLimit,
+  toInteger(coalesce($dontLimit, 6)) AS dontLimit
 
-CALL {
+CALL (useFulltext, fulltextIndex, prompt, useTags, tags, useVector, vectorIndex, embedding) {
   WITH useFulltext, fulltextIndex, prompt
   WHERE useFulltext = true AND fulltextIndex <> "" AND prompt <> ""
   CALL db.index.fulltext.queryNodes(fulltextIndex, prompt) YIELD node, score
@@ -55,6 +58,19 @@ WITH collect(m {
   .polarity,
   .title,
   .content,
+  .summary,
+  .whenToUse,
+  .howToApply,
+  .gotchas,
+  .scopeRepo,
+  .scopePackage,
+  .scopeModule,
+  .scopeRuntime,
+  .scopeVersions,
+  .evidence,
+  .outcome,
+  .validFrom,
+  .validTo,
   .tags,
   .confidence,
   .utility,

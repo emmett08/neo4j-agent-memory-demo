@@ -1,3 +1,5 @@
+// Parameters (Neo4j Browser / Neo4j VSCode :param) - example only:
+// :param { nowIso: "2026-01-04T22:07:53.086Z", halfLifeSeconds: 86400, aMin: 0.001, bMin: 0.001, pairs: [ { a: "mem_1", b: "mem_2", w: 1.0, y: 1.0 }, { a: "mem_2", b: "mem_3", w: 1.0, y: 0.0 } ] }
 WITH datetime($nowIso) AS now
 UNWIND $pairs AS pair
 MATCH (m1:Memory {id: pair.a})
