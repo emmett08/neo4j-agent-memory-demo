@@ -25,12 +25,14 @@ WITH
 
 CALL {
   WITH useFulltext, fulltextIndex, prompt
+  WITH useFulltext, fulltextIndex, prompt
   WHERE useFulltext = true AND fulltextIndex <> "" AND prompt <> ""
   CALL db.index.fulltext.queryNodes(fulltextIndex, prompt) YIELD node, score
   RETURN node AS m, score AS score
 
   UNION
 
+  WITH useTags, tags
   WITH useTags, tags
   WHERE useTags = true AND size(tags) > 0
   MATCH (m:Memory)
@@ -39,6 +41,7 @@ CALL {
 
   UNION
 
+  WITH useVector, vectorIndex, embedding
   WITH useVector, vectorIndex, embedding
   WHERE useVector = true AND vectorIndex <> "" AND embedding IS NOT NULL
   CALL db.index.vector.queryNodes(vectorIndex, embedding, 20) YIELD node, score
