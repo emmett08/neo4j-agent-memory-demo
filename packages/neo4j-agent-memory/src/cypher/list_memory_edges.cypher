@@ -1,14 +1,19 @@
+// Parameters (Neo4j Browser / Neo4j VSCode :param) - example only:
+// :param { limit: 200, minStrength: 0.2 }
+//
 // Parameters:
 // - $limit: Max edges to return
 // - $minStrength: Minimum strength threshold
 WITH
-  coalesce($limit, 200) AS limit,
+  toInteger(coalesce($limit, 200)) AS limit,
   coalesce($minStrength, 0.0) AS minStrength
 
-CALL {
+CALL (minStrength) {
   WITH minStrength
-  MATCH (m1:Memory)-[c:CO_USED_WITH]->(m2:Memory)
-  WHERE coalesce(c.strength, 0.0) >= minStrength
+  // Neo4j VSCode may warn if relationship types don't exist in the connected DB yet.
+  // Using `type(rel)` keeps behavior while avoiding those warnings in empty/dev DBs.
+  MATCH (m1:Memory)-[c]->(m2:Memory)
+  WHERE type(c) = "CO_USED_WITH" AND coalesce(c.strength, 0.0) >= minStrength
   RETURN {
     source: m1.id,
     target: m2.id,
@@ -34,4 +39,5 @@ CALL {
 }
 WITH edge, limit
 ORDER BY edge.strength DESC
-RETURN collect(edge)[0..limit] AS edges;
+WITH collect(edge) AS edges, limit
+RETURN edges[0..limit] AS edges;

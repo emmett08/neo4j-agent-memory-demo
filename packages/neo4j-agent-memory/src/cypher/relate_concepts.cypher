@@ -1,3 +1,6 @@
+// Parameters (Neo4j Browser / Neo4j VSCode :param) - example only:
+// :param { a: "mem_1", b: "mem_2", weight: 0.5 }
+//
 // Parameters:
 // - $a: Memory id (concept A)
 // - $b: Memory id (concept B)

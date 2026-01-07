@@ -1,12 +1,13 @@
 import express from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod/v3";
-import { createMemoryService, createMemoryTools, type MemoryEvent } from "neo4j-agent-memory";
+import { createMemoryService, createMemoryTools, type MemoryEvent } from "@neural/neo4j-agent-memory";
 import { tool, ToolLoopAgent } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { Auggie } from "@augmentcode/auggie-sdk";
 import { listBaseSchema, listSchema, filterPatterns } from "./memory_routes.js";
 import { resolveAgentProvider } from "./agent_provider.js";
+import { envOrThrow } from "./utils/env.js";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -14,12 +15,6 @@ app.use(express.json({ limit: "2mb" }));
 const PORT = Number(process.env.PORT ?? 8080);
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const DEFAULT_AUGGIE_MODEL = "sonnet4.5";
-
-function envOrThrow(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env var ${name}`);
-  return v;
-}
 
 type MemoryEventListener = (event: MemoryEvent) => void;
 
@@ -53,7 +48,7 @@ app.get("/health", async (_req, res) => {
 });
 
 const retrieveSchema = z.object({
-  agentId: z.string().default("auggie"),
+  agentId: z.string().default("Auggie"),
   prompt: z.string(),
   symptoms: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
@@ -91,7 +86,7 @@ app.post("/memory/retrieve", async (req, res) => {
 });
 
 const feedbackSchema = z.object({
-  agentId: z.string().default("auggie"),
+  agentId: z.string().default("Auggie"),
   sessionId: z.string(),
   usedIds: z.array(z.string()).default([]),
   usefulIds: z.array(z.string()).default([]),
@@ -178,7 +173,7 @@ app.post("/memory/patterns", async (req, res) => {
 });
 
 const runSchema = z.object({
-  agentId: z.string().default("auggie"),
+  agentId: z.string().default("Auggie"),
   prompt: z.string(),
   symptoms: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),

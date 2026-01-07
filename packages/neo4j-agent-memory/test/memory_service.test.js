@@ -74,8 +74,9 @@ test("captureEpisode formats episodic learning", async () => {
   assert.equal(captured.sessionId, "run-9");
   assert.equal(captured.learnings[0].kind, "episodic");
   assert.ok(captured.learnings[0].title.includes("triage"));
-  assert.ok(captured.learnings[0].content.includes("Prompt:"));
-  assert.ok(captured.learnings[0].content.includes("Response:"));
+  assert.ok(captured.learnings[0].content.includes("Summary:"));
+  assert.ok(!captured.learnings[0].content.includes("Prompt:"));
+  assert.ok(!captured.learnings[0].content.includes("Response:"));
 });
 
 test("captureStepEpisode includes step name", async () => {
@@ -99,6 +100,43 @@ test("captureStepEpisode includes step name", async () => {
 
   assert.ok(captured);
   assert.ok(captured.learnings[0].title.includes("fix"));
+});
+
+test("saveLearnings passes agentId into upsertMemory (WROTE edge)", async () => {
+  const mem = new MemoryService(baseConfig);
+  const writeCalls = [];
+  const readSession = {
+    run: async () => ({ records: [] }),
+    close: async () => {},
+  };
+  const writeSession = {
+    run: async (_query, params) => {
+      writeCalls.push(params);
+      return { records: [{ get: () => "mem_demo" }] };
+    },
+    close: async () => {},
+  };
+
+  mem.client = {
+    session: (mode) => (mode === "READ" ? readSession : writeSession),
+  };
+
+  await mem.saveLearnings({
+    agentId: "Auggie",
+    sessionId: "run-1",
+    learnings: [
+      {
+        kind: "semantic",
+        title: "Test memory",
+        content: "Short content that is long enough to pass validation gates.",
+        tags: ["test"],
+        confidence: 0.9,
+      },
+    ],
+  });
+
+  assert.equal(writeCalls[0].agentId, "Auggie");
+  assert.equal(writeCalls[0].taskId, "run-1");
 });
 
 test("upsertMemory auto-relates by tags when enabled", async () => {
@@ -461,6 +499,69 @@ test("getMemoryGraph returns nodes and edges", async () => {
   assert.equal(calls[0].includeRelatedTo, true);
 });
 
+test("getKnowledgeGraphByTags returns query, nodes, and edges", async () => {
+  const mem = new MemoryService(baseConfig);
+  const calls = [];
+  const readSession = {
+    run: async (_query, params) => {
+      calls.push(params);
+      return {
+        records: [
+          {
+            get: (key) => {
+              if (key === "query") return { id: "tag_query", tags: ["npm", "permissions"] };
+              if (key === "nodes") {
+                return [
+                  {
+                    id: "mem-1",
+                    kind: "semantic",
+                    polarity: "positive",
+                    title: "Concept",
+                    content: "Content body",
+                    tags: ["npm"],
+                    confidence: 0.8,
+                    utility: 0.3,
+                    triage: null,
+                    antiPattern: null,
+                    createdAt: { toString: () => "2024-01-01T00:00:00Z" },
+                    updatedAt: { toString: () => "2024-01-02T00:00:00Z" },
+                  },
+                ];
+              }
+              if (key === "edges") {
+                return [
+                  {
+                    source: "tag_query",
+                    target: "mem-1",
+                    kind: "tag_match",
+                    strength: 0.5,
+                    evidence: 1.0,
+                    matchedTags: ["npm"],
+                  },
+                ];
+              }
+              return undefined;
+            },
+          },
+        ],
+      };
+    },
+    close: async () => {},
+  };
+
+  mem.client = {
+    session: () => readSession,
+  };
+
+  const res = await mem.getKnowledgeGraphByTags({ tags: ["npm", "permissions"], limit: 10, minStrength: 0.2 });
+  assert.equal(res.query.id, "tag_query");
+  assert.equal(res.nodes.length, 1);
+  assert.equal(res.edges.length, 1);
+  assert.equal(res.edges[0].kind, "tag_match");
+  assert.equal(calls[0].limit, 10);
+  assert.equal(calls[0].minStrength, 0.2);
+});
+
 test("feedback supports neutral usage without penalizing", async () => {
   const mem = new MemoryService(baseConfig);
   const calls = [];
@@ -510,13 +611,11 @@ test("feedback supports neutral usage without penalizing", async () => {
 
 test("retrieveContextBundle falls back when no cases exist", async () => {
   const mem = new MemoryService(baseConfig);
-  mem.cyRetrieveBundle = "bundle";
-  mem.cyFallbackRetrieve = "fallback";
-  mem.cyGetRecallEdges = "recallEdges";
 
   const session = {
-    run: async (query) => {
-      if (query === "bundle") {
+    run: async (_query, params) => {
+      // Primary bundle query includes caseLimit/fixLimit/dontLimit + halfLifeSeconds and no prompt/fulltextIndex.
+      if (params?.caseLimit !== undefined && params?.halfLifeSeconds !== undefined && params?.prompt === undefined) {
         return {
           records: [
             {
@@ -525,7 +624,8 @@ test("retrieveContextBundle falls back when no cases exist", async () => {
           ],
         };
       }
-      if (query === "fallback") {
+      // Fallback query includes prompt + fulltextIndex/vectorIndex flags.
+      if (params?.prompt !== undefined && params?.fulltextIndex !== undefined) {
         return {
           records: [
             {
@@ -551,7 +651,8 @@ test("retrieveContextBundle falls back when no cases exist", async () => {
           ],
         };
       }
-      if (query === "recallEdges") {
+      // Recall edges query includes ids + agentId.
+      if (Array.isArray(params?.ids) && params?.agentId) {
         return { records: [] };
       }
       return { records: [] };

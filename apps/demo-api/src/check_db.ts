@@ -1,23 +1,9 @@
-import { createMemoryService } from "neo4j-agent-memory";
 import { exitWithError } from "./utils/errors.js";
-
-function envOrThrow(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env var ${name}`);
-  return v;
-}
+import { createNeo4jClientFromEnv } from "./utils/neo4j.js";
 
 async function main() {
-  const mem = await createMemoryService({
-    neo4j: {
-      uri: envOrThrow("NEO4J_URI"),
-      username: envOrThrow("NEO4J_USER"),
-      password: envOrThrow("NEO4J_PASSWORD"),
-    },
-  });
-
-  // Check what's in the database
-  const session = (mem as any).client.session("READ");
+  const client = createNeo4jClientFromEnv();
+  const session = client.session("READ");
   
   try {
     // Check labels
@@ -85,9 +71,8 @@ async function main() {
     
   } finally {
     await session.close();
+    await client.close();
   }
-
-  await mem.close();
 }
 
 main().catch(exitWithError);

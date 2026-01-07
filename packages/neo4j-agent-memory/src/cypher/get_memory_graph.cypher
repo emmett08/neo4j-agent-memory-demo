@@ -1,3 +1,6 @@
+// Parameters (Neo4j Browser / Neo4j VSCode :param) - example only:
+// :param { agentId: "agent-1", memoryIds: ["mem_1", "mem_2"], includeNodes: true, includeRelatedTo: true }
+//
 // Parameters:
 // - $agentId: Agent id for RECALLS edges
 // - $memoryIds: Array of memory ids
@@ -13,7 +16,10 @@ CALL (ids, includeNodes) {
   WITH ids, includeNodes
   MATCH (m:Memory)
   WHERE includeNodes = true AND m.id IN ids
-  OPTIONAL MATCH (m)-[:APPLIES_IN]->(e:EnvironmentFingerprint)
+  // Neo4j VSCode may warn if relationship types don't exist in the connected DB yet.
+  // Using `type(rel)` keeps behavior while avoiding those warnings in empty/dev DBs.
+  OPTIONAL MATCH (m)-[rel]->(e:EnvironmentFingerprint)
+  WHERE type(rel) = "APPLIES_IN"
   WITH m, collect(e {
     .hash,
     .os,
@@ -32,11 +38,28 @@ CALL (ids, includeNodes) {
     .polarity,
     .title,
     .content,
+    .summary,
+    .whenToUse,
+    .howToApply,
+    .gotchas,
+    .scopeRepo,
+    .scopePackage,
+    .scopeModule,
+    .scopeRuntime,
+    .scopeVersions,
+    .evidence,
+    .outcome,
+    .validFrom,
+    .validTo,
     .tags,
     .confidence,
     .utility,
     .triage,
+    .signals,
+    .distilled,
     .antiPattern,
+    .concepts,
+    .symptoms,
     .createdAt,
     .updatedAt,
     env: envs[0]
@@ -52,8 +75,8 @@ CALL (ids, includeNodes) {
 CALL (ids, agentId) {
   WITH ids, agentId
   WHERE agentId IS NOT NULL AND agentId <> ""
-  MATCH (a:Agent {id: agentId})-[r:RECALLS]->(m:Memory)
-  WHERE m.id IN ids
+  MATCH (a:Agent {id: agentId})-[r]->(m:Memory)
+  WHERE type(r) = "RECALLS" AND m.id IN ids
   RETURN collect({
     source: a.id,
     target: m.id,
@@ -72,8 +95,8 @@ CALL (ids, agentId) {
 
 CALL (ids) {
   WITH ids
-  MATCH (m1:Memory)-[c:CO_USED_WITH]->(m2:Memory)
-  WHERE m1.id IN ids AND m2.id IN ids
+  MATCH (m1:Memory)-[c]->(m2:Memory)
+  WHERE type(c) = "CO_USED_WITH" AND m1.id IN ids AND m2.id IN ids
   RETURN collect({
     source: m1.id,
     target: m2.id,
@@ -87,8 +110,8 @@ CALL (ids) {
 CALL (ids, includeRelatedTo) {
   WITH ids, includeRelatedTo
   WHERE includeRelatedTo = true
-  MATCH (m1:Memory)-[r:RELATED_TO]->(m2:Memory)
-  WHERE m1.id IN ids AND m2.id IN ids
+  MATCH (m1:Memory)-[r]->(m2:Memory)
+  WHERE type(r) = "RELATED_TO" AND m1.id IN ids AND m2.id IN ids
   RETURN collect({
     source: m1.id,
     target: m2.id,

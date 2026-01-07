@@ -13,8 +13,9 @@
     "@ai-sdk/openai": "^2.0.53",
     "@augmentcode/auggie-sdk": "^0.1.11",
     "ai": "^6.0.3",
+    "csv-parse": "^6.1.0",
     "express": "^5.2.1",
-    "neo4j-agent-memory": "file:../../packages/neo4j-agent-memory",
+    "@neural/neo4j-agent-memory": "file:../../packages/neo4j-agent-memory",
     "zod": "^4.2.1"
   }
 }

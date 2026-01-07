@@ -1,3 +1,6 @@
+// Parameters (Neo4j Browser / Neo4j VSCode :param) - example only:
+// :param { caseId: "case_demo", title: "npm EACCES", summary: "Permission denied on cache directory.", outcome: "resolved", symptoms: ["eacces", "permission denied"], env: { hash: "env_demo", os: "macos", distro: null, ci: null, container: false, filesystem: null, workspaceMount: "local", nodeVersion: "20.11.0", packageManager: "npm", pmVersion: "10.9.0" }, resolvedByMemoryIds: ["mem_1"], negativeMemoryIds: [], resolvedAtIso: "2026-01-07T00:00:00Z" }
+//
 // Parameters:
 // - $caseId: Unique case identifier string
 // - $title: Case title string

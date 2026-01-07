@@ -1,0 +1,23 @@
+# id,title,summary,outcome,symptoms,env_os,env_ci,env_container,env_packageManager,env_nodeVersion,resolvedByMemoryIds,negativeMemoryIds,resolvedAtIso
+id,title,summary,outcome,symptoms,env_os,env_ci,env_container,env_packageManager,env_nodeVersion,resolvedByMemoryIds,negativeMemoryIds,resolvedAtIso
+case_ui_prompt_builder_001,Users unsure what context will be sent,Users could not see context before running agent,resolved,unclear ui|user confusion|context visibility,,false,false,,,mem_prompt_builder_layout|mem_ux_progressive_disclosure|mem_primary_cta,mem_antipattern_autorun_keystroke,2026-01-01T00:00:00Z
+case_ui_errors_001,Validation errors missed,Toast only errors were missed by users,resolved,form errors|toast notifications|validation,,false,false,,,mem_async_ui_states|mem_a11y_semantic_html,mem_antipattern_toast_only_errors|mem_episode_toast_abandonment,2026-01-01T00:00:00Z
+case_react19_hydration_001,React hydration mismatch,Server client mismatch caused hydration errors,resolved,hydration error|react 19|timestamp mismatch,,false,false,,20,mem_episode_hydration_fix,,2026-01-01T00:00:00Z
+case_auto_refresh_cost_001,Auto refresh cost spike,Auto refresh on input created many calls,resolved,api cost|auto refresh|performance,,false,false,,,mem_prompt_builder_layout,mem_antipattern_autorun_keystroke|mem_episode_autorefresh_cost_spike,2026-01-01T00:00:00Z
+case_chip_keyboard_ux_001,Chip input lacked keyboard shortcuts,Missing keyboard shortcuts hurt usability,resolved,keyboard navigation|chip input|accessibility,,false,false,,,mem_react_chip_filters|mem_episode_chip_testing,,2026-01-01T00:00:00Z
+case_npm_eacces_macos_001,npm install EACCES on macOS,npm prefix misconfiguration caused EACCES,resolved,eacces|permission denied|npm install|macos,macos,false,false,npm,20,mem_fix_npm_eacces_macos|mem_episode_npm_eacces_resolved,mem_antipattern_sudo_npm,2026-01-01T00:00:00Z
+case_seed_001,Seed script slow,Seed took too long to run,resolved,seed slow|neo4j performance,linux,false,false,,20,mem_seed_013,mem_seed_012,2026-01-02T00:00:00Z
+case_seed_002,Missing fulltext index,Fallback fulltext query failed,resolved,fulltext query fails|index missing,linux,false,false,,20,mem_seed_007,,2026-01-02T00:00:00Z
+case_seed_003,ESM import errors,Imports failed due to ESM mismatch,resolved,module not found|esm import,macos,false,false,npm,20,mem_seed_004,,2026-01-02T00:00:00Z
+case_seed_004,Need deterministic tests,Tests were flaky due to time,resolved,flaky tests|nondeterminism,linux,true,false,,20,mem_seed_006,,2026-01-02T00:00:00Z
+case_seed_005,Need better retrieval tags,Retrieval missed because tags were absent,resolved,retrieval misses|missing tags,linux,false,false,,20,mem_seed_014,,2026-01-02T00:00:00Z
+case_seed_006,Need safer tool usage,Agent ran tools unexpectedly,resolved,unexpected tool use|safety,linux,false,false,,20,mem_seed_001|mem_seed_015,,2026-01-02T00:00:00Z
+case_seed_007,Need prompt structure,Prompt was hard to follow,resolved,unclear prompt|formatting,linux,false,false,,20,mem_seed_002,,2026-01-02T00:00:00Z
+case_seed_008,Need stable citations,Citations were inconsistent,resolved,citation mismatch|memory ids,linux,false,false,,20,mem_seed_003,,2026-01-02T00:00:00Z
+case_seed_009,Need MERGE idempotency,Seed created duplicate nodes,resolved,duplicate nodes|seed,linux,false,false,,20,mem_seed_011,,2026-01-02T00:00:00Z
+case_seed_010,Need schema constraints,Duplicate ids caused collisions,resolved,duplicate ids|schema,linux,false,false,,20,mem_seed_008,,2026-01-02T00:00:00Z
+case_seed_011,Need modular code,Files became too large,resolved,large files|complexity,linux,false,false,,20,mem_seed_009,,2026-01-02T00:00:00Z
+case_seed_012,Need observe errors,Errors were swallowed,resolved,missing logs|silent failures,linux,false,false,,20,mem_seed_005,,2026-01-02T00:00:00Z
+case_seed_013,Prefer composable modules,Multiple responsibilities in one file,resolved,refactor needed|maintainability,linux,false,false,,20,mem_seed_009,,2026-01-02T00:00:00Z
+case_seed_014,Prefer explicit execution,User expected manual run,resolved,unexpected execution|user intent,linux,false,false,,20,mem_seed_015,,2026-01-02T00:00:00Z
+

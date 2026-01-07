@@ -1,5 +1,14 @@
 export type MemoryKind = "semantic" | "procedural" | "episodic";
 export type MemoryPolarity = "positive" | "negative";
+export type MemoryOutcome = "success" | "partial" | "dead_end";
+
+export interface MemoryScope {
+  repo?: string;
+  package?: string;
+  module?: string;
+  runtime?: string;
+  versions?: string[];
+}
 
 export interface EnvironmentFingerprint {
   hash?: string; // optional; service will compute if absent
@@ -36,6 +45,15 @@ export interface MemoryRecord {
   polarity: MemoryPolarity;
   title: string;
   content: string;              // canonical plain text
+  summary?: string;             // 1-3 sentences
+  whenToUse?: string[];         // concrete triggers (symptoms/env/versions)
+  howToApply?: string[];        // steps/commands/files/symbols
+  gotchas?: string[];           // dead ends / failure modes
+  scope?: MemoryScope;          // applicability boundaries
+  evidence?: string[];          // minimal logs/links/hashes
+  outcome?: MemoryOutcome;      // success/partial/dead_end
+  validFrom?: string;           // ISO string
+  validTo?: string;             // ISO string
   tags: string[];
   confidence: number;           // 0..1
   utility: number;              // 0..1
@@ -91,6 +109,28 @@ export interface MemoryGraphResponse {
   edges: MemoryGraphEdge[];
 }
 
+export interface KnowledgeGraphQuery {
+  id: string;
+  tags: string[];
+}
+
+export interface KnowledgeGraphEdge {
+  source: string;
+  target: string;
+  kind: "tag_match" | "co_used_with" | "related_to";
+  /** Strength in [0..1] (tag overlap for tag_match; posterior mean for co_used_with; weight for related_to) */
+  strength: number;
+  /** Evidence mass (matched tag count for tag_match; a+b for co_used_with; 1.0 for related_to) */
+  evidence: number;
+  matchedTags?: string[];
+}
+
+export interface KnowledgeGraphResponse {
+  query: KnowledgeGraphQuery;
+  nodes: MemoryRecord[];
+  edges: KnowledgeGraphEdge[];
+}
+
 export interface CaseRecord {
   id: string;
   title: string;
@@ -140,6 +180,13 @@ export interface GetMemoryGraphArgs {
   memoryIds: string[];
   includeNodes?: boolean;
   includeRelatedTo?: boolean;
+}
+
+export interface GetKnowledgeGraphByTagsArgs {
+  tags: string[];
+  limit?: number;
+  minStrength?: number;
+  includeNodes?: boolean;
 }
 
 export interface BetaEdge {
@@ -258,10 +305,25 @@ export interface LearningCandidate {
   polarity?: MemoryPolarity; // default positive
   title: string;
   content: string;
+  summary?: string;
+  whenToUse?: string[];
+  howToApply?: string[];
+  gotchas?: string[];
+  scope?: MemoryScope;
+  evidence?: string[];
+  outcome?: MemoryOutcome;
+  validFromIso?: string | null;
+  validToIso?: string | null;
+  contentHash?: string;
   tags: string[];
   confidence: number; // 0..1
   utility?: number; // 0..1 optional override
   signals?: MemoryRecord["signals"];
+  distilled?: MemoryRecord["distilled"];
+  concepts?: string[];
+  filePaths?: string[];
+  toolNames?: string[];
+  errorSignatures?: string[];
   env?: EnvironmentFingerprint;
   triage?: MemoryTriage;
   antiPattern?: MemoryRecord["antiPattern"];
@@ -301,6 +363,11 @@ export interface MemoryServiceConfig {
   halfLifeSeconds?: number; // default 30 days
   autoRelate?: AutoRelateConfig;
   onMemoryEvent?: (event: MemoryEvent) => void;
+  logger?: {
+    info: (msg: string, meta?: Record<string, unknown>) => void;
+    warn: (msg: string, meta?: Record<string, unknown>) => void;
+    error: (msg: string, meta?: Record<string, unknown>) => void;
+  };
 }
 
 export type MemoryToolName =
@@ -320,3 +387,16 @@ export interface MemoryToolDefinition<TInput, TResult> {
 }
 
 export type MemoryToolSet = Record<MemoryToolName, MemoryToolDefinition<any, any>>;
+
+export interface SearchMemoriesArgs {
+  query: string;
+  tags?: string[];
+  kind?: MemoryKind;
+  outcome?: MemoryOutcome;
+  scope?: MemoryScope;
+  topK?: number;
+}
+
+export interface SearchMemorySummary extends MemorySummary {
+  score: number;
+}

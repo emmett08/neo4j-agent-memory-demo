@@ -1,3 +1,6 @@
+// Parameters (Neo4j Browser / Neo4j VSCode :param) - example only:
+// :param { prompt: "permission denied", tags: ["npm", "permissions"], kinds: ["semantic", "procedural"], fulltextIndex: "memoryText", vectorIndex: "memoryEmbedding", embedding: null, useFulltext: true, useVector: false, useTags: true, fixLimit: 8, dontLimit: 6 }
+//
 // Parameters:
 // - $prompt: Query text
 // - $tags: Array of tags
@@ -20,11 +23,10 @@ WITH
   coalesce($useFulltext, true) AS useFulltext,
   coalesce($useVector, false) AS useVector,
   coalesce($useTags, true) AS useTags,
-  coalesce($fixLimit, 8) AS fixLimit,
-  coalesce($dontLimit, 6) AS dontLimit
+  toInteger(coalesce($fixLimit, 8)) AS fixLimit,
+  toInteger(coalesce($dontLimit, 6)) AS dontLimit
 
-CALL {
-  WITH useFulltext, fulltextIndex, prompt
+CALL (useFulltext, fulltextIndex, prompt, useTags, tags, useVector, vectorIndex, embedding) {
   WITH useFulltext, fulltextIndex, prompt
   WHERE useFulltext = true AND fulltextIndex <> "" AND prompt <> ""
   CALL db.index.fulltext.queryNodes(fulltextIndex, prompt) YIELD node, score
@@ -33,7 +35,6 @@ CALL {
   UNION
 
   WITH useTags, tags
-  WITH useTags, tags
   WHERE useTags = true AND size(tags) > 0
   MATCH (m:Memory)
   WHERE any(t IN tags WHERE t IN coalesce(m.tags, []))
@@ -41,7 +42,6 @@ CALL {
 
   UNION
 
-  WITH useVector, vectorIndex, embedding
   WITH useVector, vectorIndex, embedding
   WHERE useVector = true AND vectorIndex <> "" AND embedding IS NOT NULL
   CALL db.index.vector.queryNodes(vectorIndex, embedding, 20) YIELD node, score
@@ -58,6 +58,19 @@ WITH collect(m {
   .polarity,
   .title,
   .content,
+  .summary,
+  .whenToUse,
+  .howToApply,
+  .gotchas,
+  .scopeRepo,
+  .scopePackage,
+  .scopeModule,
+  .scopeRuntime,
+  .scopeVersions,
+  .evidence,
+  .outcome,
+  .validFrom,
+  .validTo,
   .tags,
   .confidence,
   .utility,

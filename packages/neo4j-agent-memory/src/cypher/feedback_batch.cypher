@@ -1,14 +1,5 @@
-// :param {
-//   nowIso: "2026-01-04T22:07:53.086Z",
-//   agentId: "agent-123",
-//   halfLifeSeconds: 86400,
-//   aMin: 1.0,
-//   bMin: 1.0,
-//   items: [
-//     { memoryId: "mem_8cd773c2-208c-45ad-97ea-1b2337dca751", w: 1.0, y: 1.0 },
-//     { memoryId: "mem_64fbcc73-0b5c-4041-8b6b-66514ffaf1d0", w: 1.0, y: 0.0 }
-//   ]
-// }
+// Parameters (Neo4j Browser / Neo4j VSCode :param) - example only:
+// :param { nowIso: "2026-01-04T22:07:53.086Z", agentId: "agent-123", halfLifeSeconds: 86400, aMin: 1.0, bMin: 1.0, items: [ { memoryId: "mem_8cd773c2-208c-45ad-97ea-1b2337dca751", w: 1.0, y: 1.0 }, { memoryId: "mem_64fbcc73-0b5c-4041-8b6b-66514ffaf1d0", w: 1.0, y: 0.0 } ] }
 WITH datetime($nowIso) AS now
 
 UNWIND $items AS item

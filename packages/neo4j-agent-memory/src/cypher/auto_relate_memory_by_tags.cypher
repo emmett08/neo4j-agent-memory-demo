@@ -32,7 +32,7 @@ WITH
   size([t IN srcTags WHERE t IN coalesce(m.tags, [])]) AS shared,
   size(srcTags) AS aSize,
   size(coalesce(m.tags, [])) AS bSize
-WHERE shared >= $minSharedTags
+WHERE shared >= toInteger($minSharedTags)
 WITH
   src,
   now,
@@ -44,7 +44,7 @@ WITH
   END AS weight
 WHERE weight >= $minWeight
 ORDER BY weight DESC, shared DESC
-LIMIT $maxCandidates
+LIMIT toInteger($maxCandidates)
 MERGE (src)-[r:RELATED_TO]->(m)
 ON CREATE SET r.weight = weight, r.createdAt = now, r.updatedAt = now
 ON MATCH SET r.weight = weight, r.updatedAt = now
