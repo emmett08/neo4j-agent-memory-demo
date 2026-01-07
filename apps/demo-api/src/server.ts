@@ -1,7 +1,7 @@
 import express from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod/v3";
-import { createMemoryService, createMemoryTools, type MemoryEvent } from "@neural/neo4j-agent-memory";
+import { createMemoryService, createMemoryTools, type MemoryEvent } from "@neuralsea/neo4j-agent-memory";
 import { tool, ToolLoopAgent } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { Auggie } from "@augmentcode/auggie-sdk";

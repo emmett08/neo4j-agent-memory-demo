@@ -1,5 +1,5 @@
 import { z } from "zod/v3";
-import type { MemorySummary } from "@neural/neo4j-agent-memory";
+import type { MemorySummary } from "@neuralsea/neo4j-agent-memory";
 
 export const listBaseSchema = z.object({
   agentId: z.string().optional(),

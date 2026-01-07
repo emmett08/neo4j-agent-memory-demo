@@ -1,4 +1,4 @@
-# @neural/neo4j-agent-memory
+# @neuralsea/neo4j-agent-memory
 
 A Neo4j-backed memory system for AI agents:
 - semantic / procedural / episodic memories
@@ -11,7 +11,7 @@ A Neo4j-backed memory system for AI agents:
 ## Install (npm)
 
 ```bash
-npm install @neural/neo4j-agent-memory
+npm install @neuralsea/neo4j-agent-memory
 ```
 
 ## Requirements
@@ -29,7 +29,7 @@ Minimal requirements (tested):
 ## Core API
 
 ```ts
-import { createMemoryService } from "@neural/neo4j-agent-memory";
+import { createMemoryService } from "@neuralsea/neo4j-agent-memory";
 
 const mem = await createMemoryService({
   neo4j: { uri, username, password },
@@ -123,7 +123,7 @@ Note: `:param` lines are only supported in Neo4j Browser; other runners should p
 Use the tool factory to preserve the existing tool surface used by the demo:
 
 ```ts
-import { createMemoryService, createMemoryTools } from "@neural/neo4j-agent-memory";
+import { createMemoryService, createMemoryTools } from "@neuralsea/neo4j-agent-memory";
 
 const mem = await createMemoryService({ neo4j: { uri, username, password } });
 const tools = createMemoryTools(mem);
@@ -323,7 +323,7 @@ const mem = await createMemoryService({
 Schema helpers and cypher assets are exported for integrations:
 
 ```ts
-import { ensureSchema, schemaVersion, migrate, cypher } from "@neural/neo4j-agent-memory";
+import { ensureSchema, schemaVersion, migrate, cypher } from "@neuralsea/neo4j-agent-memory";
 ```
 
 ## Intended usage (demo + API)

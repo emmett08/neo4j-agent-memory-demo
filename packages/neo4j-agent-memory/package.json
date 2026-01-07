@@ -1,6 +1,6 @@
 {
-  "name": "@neural/neo4j-agent-memory",
-  "version": "0.6.0",
+  "name": "@neuralsea/neo4j-agent-memory",
+  "version": "0.6.1",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

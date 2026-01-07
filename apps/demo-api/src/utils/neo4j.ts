@@ -1,4 +1,4 @@
-import { Neo4jClient } from "@neural/neo4j-agent-memory";
+import { Neo4jClient } from "@neuralsea/neo4j-agent-memory";
 import { envOrDefault, envOrThrow } from "./env.js";
 
 export function createNeo4jClientFromEnv(): Neo4jClient {

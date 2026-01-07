@@ -1,6 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { computeContentHashForCard, cypher, envHash, sha256Hex } from "@neural/neo4j-agent-memory";
+import { computeContentHashForCard, cypher, envHash, sha256Hex } from "@neuralsea/neo4j-agent-memory";
 import { exitWithError } from "./utils/errors.js";
 import { parseBoolean, parseCsvFile, parseNumber, parsePipeList } from "./utils/csv.js";
 import { envBool, envInt } from "./utils/env.js";
