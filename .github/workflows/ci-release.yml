@@ -85,6 +85,13 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      - name: NPM auth preflight
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: packages/neo4j-agent-memory
+        run: |
+          npm whoami
+
       - name: Publish to npmjs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

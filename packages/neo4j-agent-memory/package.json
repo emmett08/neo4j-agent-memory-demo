@@ -23,7 +23,8 @@
     "README.md"
   ],
   "publishConfig": {
-    "registry": "https://registry.npmjs.org"
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   },
   "scripts": {
     "build": "tsup && cp -r src/cypher dist/",
