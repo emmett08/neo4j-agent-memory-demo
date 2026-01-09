@@ -63,6 +63,7 @@ Bolt: neo4j://localhost:7687
 ```bash
 npm install
 ```
+Postinstall will verify the local workspace link for `@neuralsea/neo4j-agent-memory`.
 
 #### 3) Configure demo-api
 

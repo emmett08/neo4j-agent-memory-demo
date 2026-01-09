@@ -10,6 +10,7 @@
     "dev": "npm -w apps/demo-api run dev",
     "lint": "npm -ws run lint",
     "test": "npm -ws run test",
+    "postinstall": "node scripts/ensure-workspace-links.mjs",
     "setup": "npm install && npm run build && npm run db:seed",
     "db:start": "docker compose up -d",
     "db:stop": "docker compose down",

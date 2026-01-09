@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node ../../scripts/ensure-workspace-links.mjs",
     "dev": "npx tsx --env-file=.env src/server.ts",
     "build": "echo \"(demo build stub)\"",
     "lint": "echo \"(lint stub)\"",
+    "pretest": "node ../../scripts/ensure-workspace-links.mjs",
     "test": "tsx --test test/index.ts",
     "seed": "npx tsx --env-file=.env src/seed.ts"
   },
